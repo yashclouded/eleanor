@@ -950,7 +950,7 @@ Run the suite and paste the output. Commit: "feat(api): sets and adaptive next p
 
 **Done when:**
 
-- [ ] The tests pass. The no-leak assertion is present.
+- [x] The tests pass. The no-leak assertion is present.
 
 ### Task 3.3: Commit and give up (the rated transaction)
 
