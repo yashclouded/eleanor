@@ -302,8 +302,8 @@ Commit: "feat(shared): seeded rng, answer parsing and grading".
 
 **Done when:**
 
-- [ ] `npm test -- supabase/functions/_shared/grading.test.ts` passes. Every case above is present.
-- [ ] `npm run check` passes.
+- [x] `npm test -- supabase/functions/_shared/grading.test.ts` passes. Every case above is present.
+- [x] `npm run check` passes.
 
 ### Task 1.2: Learner model ERM-1
 
