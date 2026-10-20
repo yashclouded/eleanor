@@ -15,6 +15,10 @@ import {
   handleRepairAttempt,
   handleRevealAttempt,
 } from './routes/attempts.ts'
+import {
+  handleGetDaily,
+  handleGetDailyStats,
+} from './routes/daily.ts'
 
 export type Ctx = {
   userId: string
@@ -63,6 +67,8 @@ const routes: RouteEntry[] = [
   createRoute('POST', '/attempts/:id/give-up', handleGiveUpAttempt),
   createRoute('POST', '/attempts/:id/repair', handleRepairAttempt),
   createRoute('POST', '/attempts/:id/reveal', handleRevealAttempt),
+  createRoute('GET', '/daily/stats', handleGetDailyStats),
+  createRoute('GET', '/daily', handleGetDaily),
 ]
 
 export async function route(req: Request, ctx: Omit<Ctx, 'params'>): Promise<Response> {

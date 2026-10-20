@@ -1097,8 +1097,8 @@ Implement, run, paste output. Commit: "feat(api): Daily Crux with crowd stats".
 
 **Done when:**
 
-- [ ] The tests pass.
-- [ ] There is a test showing the test-clock header is ignored when the flag is off.
+- [x] The tests pass.
+- [x] There is a test showing the test-clock header is ignored when the flag is off.
 
 ### Task 3.6: Export, account deletion, reports, and scheduled jobs
 

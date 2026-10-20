@@ -77,7 +77,8 @@ export async function call<T = any>(
   path: string,
   body?: unknown,
   token?: string,
-  method?: string
+  method?: string,
+  extraHeaders?: Record<string, string>
 ): Promise<ApiResponse<T>> {
   const cleanPath = path.startsWith('/') ? path : `/${path}`
   const url = `${SUPABASE_URL}/functions/v1/api${cleanPath}`
@@ -90,6 +91,9 @@ export async function call<T = any>(
   }
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json'
+  }
+  if (extraHeaders) {
+    Object.assign(headers, extraHeaders)
   }
 
   const httpMethod = method ?? (body !== undefined ? 'POST' : 'GET')
