@@ -495,7 +495,7 @@ Do NOT mark anything reviewed or published. Commit: "feat(content): template con
 
 **Done when:**
 
-- [ ] `npm run content:check` exits 0 on the real bank and non-zero on each broken fixture (covered by the test).
+- [x] `npm run content:check` exits 0 on the real bank and non-zero on each broken fixture (covered by the test).
 - [ ] The preview file is readable by a non-programmer. 🔒 The owner skims it.
 
 ### Task 1.4: Selection engine
