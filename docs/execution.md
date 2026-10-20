@@ -553,8 +553,8 @@ Implement, run, paste output. Commit: "feat(shared): adaptive selection engine".
 
 **Done when:**
 
-- [ ] All listed tests pass.
-- [ ] `select.ts` imports nothing outside `_shared`.
+- [x] All listed tests pass.
+- [x] `select.ts` imports nothing outside `_shared`.
 
 ### Task 1.5: Model simulation gate
 
