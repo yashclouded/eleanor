@@ -9,6 +9,10 @@ import {
   handleNextProblem,
   handleGetAttempt,
 } from './routes/sets.ts'
+import {
+  handleCommitAttempt,
+  handleGiveUpAttempt,
+} from './routes/attempts.ts'
 
 export type Ctx = {
   userId: string
@@ -53,6 +57,8 @@ const routes: RouteEntry[] = [
   createRoute('POST', '/sets', handleCreateSet),
   createRoute('POST', '/sets/:id/next', handleNextProblem),
   createRoute('GET', '/attempts/:id', handleGetAttempt),
+  createRoute('POST', '/attempts/:id/commit', handleCommitAttempt),
+  createRoute('POST', '/attempts/:id/give-up', handleGiveUpAttempt),
 ]
 
 export async function route(req: Request, ctx: Omit<Ctx, 'params'>): Promise<Response> {

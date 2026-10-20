@@ -178,64 +178,122 @@ describe('API: Sets and next problem', () => {
     expect(nextRes.data.data.kind).toBe('unrated')
   })
 
-  it('a stub test for resolving all slots marks the set completed', async () => {
-    const user = await onboardUser('set_user_complete')
-    const setRes = await call(
-      '/sets',
-      { transitionId: crypto.randomUUID(), track: 'judgment', mode: 'rated' },
-      user.token
-    )
-    const set = setRes.data.data.set
-    const setSize = set.size
+  it('completing every slot through real commits closes the set as completed and returns a summary with correct deltas', async () => {
+    // Insert temporary published items for different concepts and families
+    const testItemIds = [
+      'judgment.base-rate.screening@1#1_freq',
+      'judgment.base-rate.screening@1#2_freq',
+      'judgment.base-rate.screening@1#3_freq',
+      'judgment.base-rate.screening@1#1_freq2',
+      'judgment.base-rate.screening@1#2_freq2',
+      'judgment.base-rate.screening@1#3_freq2',
+      'judgment.base-rate.screening@1#1_est',
+      'judgment.base-rate.screening@1#2_est',
+      'judgment.base-rate.screening@1#3_est',
+      'judgment.base-rate.screening@1#1_est2',
+      'judgment.base-rate.screening@1#2_est2',
+      'judgment.base-rate.screening@1#3_est2',
+      'judgment.base-rate.screening@1#1_cond',
+      'judgment.base-rate.screening@1#2_cond',
+      'judgment.base-rate.screening@1#3_cond',
+      'judgment.base-rate.screening@1#1_exp',
+      'judgment.base-rate.screening@1#2_exp',
+      'judgment.base-rate.screening@1#3_exp',
+      'judgment.base-rate.screening@1#1_base',
+      'judgment.base-rate.screening@1#2_base',
+      'judgment.base-rate.screening@1#3_base',
+    ]
 
-    // First slot via next
-    const next0 = await call(`/sets/${set.id}/next`, { transitionId: crypto.randomUUID() }, user.token)
-    expect(next0.status).toBe(200)
-    expect(next0.data.ok).toBe(true)
-    const attempt0 = next0.data.data
-    expect(attempt0.slot).toBe(0)
-
-    // Stub resolution of slot 0 by direct SQL
     await testSql`
-      update attempts
-      set state = 'resolved',
-          outcome = 'correct',
-          confidence = 0.9,
-          item_rating = 1200,
-          rating_delta = 15,
-          resolved_at = now()
-      where id = ${attempt0.id}
+      insert into families (id, concept_id)
+      values
+        ('fam_freq', 'judgment.frequencies'),
+        ('fam_freq2', 'judgment.frequencies'),
+        ('fam_est', 'judgment.estimation'),
+        ('fam_est2', 'judgment.estimation'),
+        ('fam_cond', 'judgment.conditional'),
+        ('fam_exp', 'judgment.expected-value'),
+        ('fam_base', 'judgment.base-rates')
+      on conflict (id) do nothing
     `
 
-    // Stub remaining slots of the set directly in SQL (as content has only 1 template for judgment)
-    for (let slot = 1; slot < setSize; slot++) {
-      const instId = crypto.randomUUID()
-      await testSql`
-        insert into instances (id, item_id, seed, skin, prompt, answer_spec, created_at)
-        values (${instId}, 'judgment.base-rate.screening@1#1', ${slot}, 'factory', '[]'::jsonb, '{}'::jsonb, now())
-      `
-      await testSql`
-        insert into attempts (
-          id, user_id, set_id, slot, instance_id, item_id,
-          track_id, concept_id, family_id, kind, state, rated,
-          outcome, confidence, item_rating, rating_delta, resolved_at, presented_at
-        ) values (
-          ${crypto.randomUUID()}, ${set.user_id}, ${set.id}, ${slot}, ${instId}, 'judgment.base-rate.screening@1#1',
-          'judgment', 'judgment.base-rates', 'base-rate-screening', 'selected', 'resolved', true,
-          'correct', 0.85, 1200, 10, now(), now()
+    await testSql`
+      insert into items (id, kind, source_id, source_version, level, track_id, concept_id, family_id, rating, rd, status, anchor)
+      values
+        ('judgment.base-rate.screening@1#1_freq', 'generated', 'judgment.base-rate.screening', 1, 1, 'judgment', 'judgment.frequencies', 'fam_freq', 1200, 250, 'published', true),
+        ('judgment.base-rate.screening@1#2_freq', 'generated', 'judgment.base-rate.screening', 1, 2, 'judgment', 'judgment.frequencies', 'fam_freq', 1500, 250, 'published', true),
+        ('judgment.base-rate.screening@1#3_freq', 'generated', 'judgment.base-rate.screening', 1, 3, 'judgment', 'judgment.frequencies', 'fam_freq', 1800, 250, 'published', true),
+        ('judgment.base-rate.screening@1#1_freq2', 'generated', 'judgment.base-rate.screening', 1, 1, 'judgment', 'judgment.frequencies', 'fam_freq2', 1200, 250, 'published', true),
+        ('judgment.base-rate.screening@1#2_freq2', 'generated', 'judgment.base-rate.screening', 1, 2, 'judgment', 'judgment.frequencies', 'fam_freq2', 1500, 250, 'published', true),
+        ('judgment.base-rate.screening@1#3_freq2', 'generated', 'judgment.base-rate.screening', 1, 3, 'judgment', 'judgment.frequencies', 'fam_freq2', 1800, 250, 'published', true),
+        ('judgment.base-rate.screening@1#1_est', 'generated', 'judgment.base-rate.screening', 1, 1, 'judgment', 'judgment.estimation', 'fam_est', 1200, 250, 'published', true),
+        ('judgment.base-rate.screening@1#2_est', 'generated', 'judgment.base-rate.screening', 1, 2, 'judgment', 'judgment.estimation', 'fam_est', 1500, 250, 'published', true),
+        ('judgment.base-rate.screening@1#3_est', 'generated', 'judgment.base-rate.screening', 1, 3, 'judgment', 'judgment.estimation', 'fam_est', 1800, 250, 'published', true),
+        ('judgment.base-rate.screening@1#1_est2', 'generated', 'judgment.base-rate.screening', 1, 1, 'judgment', 'judgment.estimation', 'fam_est2', 1200, 250, 'published', true),
+        ('judgment.base-rate.screening@1#2_est2', 'generated', 'judgment.base-rate.screening', 1, 2, 'judgment', 'judgment.estimation', 'fam_est2', 1500, 250, 'published', true),
+        ('judgment.base-rate.screening@1#3_est2', 'generated', 'judgment.base-rate.screening', 1, 3, 'judgment', 'judgment.estimation', 'fam_est2', 1800, 250, 'published', true),
+        ('judgment.base-rate.screening@1#1_cond', 'generated', 'judgment.base-rate.screening', 1, 1, 'judgment', 'judgment.conditional', 'fam_cond', 1200, 250, 'published', true),
+        ('judgment.base-rate.screening@1#2_cond', 'generated', 'judgment.base-rate.screening', 1, 2, 'judgment', 'judgment.conditional', 'fam_cond', 1500, 250, 'published', true),
+        ('judgment.base-rate.screening@1#3_cond', 'generated', 'judgment.base-rate.screening', 1, 3, 'judgment', 'judgment.conditional', 'fam_cond', 1800, 250, 'published', true),
+        ('judgment.base-rate.screening@1#1_exp', 'generated', 'judgment.base-rate.screening', 1, 1, 'judgment', 'judgment.expected-value', 'fam_exp', 1200, 250, 'published', true),
+        ('judgment.base-rate.screening@1#2_exp', 'generated', 'judgment.base-rate.screening', 1, 2, 'judgment', 'judgment.expected-value', 'fam_exp', 1500, 250, 'published', true),
+        ('judgment.base-rate.screening@1#3_exp', 'generated', 'judgment.base-rate.screening', 1, 3, 'judgment', 'judgment.expected-value', 'fam_exp', 1800, 250, 'published', true),
+        ('judgment.base-rate.screening@1#1_base', 'generated', 'judgment.base-rate.screening', 1, 1, 'judgment', 'judgment.base-rates', 'fam_base', 1200, 250, 'published', true),
+        ('judgment.base-rate.screening@1#2_base', 'generated', 'judgment.base-rate.screening', 1, 2, 'judgment', 'judgment.base-rates', 'fam_base', 1500, 250, 'published', true),
+        ('judgment.base-rate.screening@1#3_base', 'generated', 'judgment.base-rate.screening', 1, 3, 'judgment', 'judgment.base-rates', 'fam_base', 1800, 250, 'published', true)
+      on conflict (id) do update set status = 'published'
+    `
+
+    try {
+      const user = await onboardUser('set_user_complete')
+      const setRes = await call(
+        '/sets',
+        { transitionId: crypto.randomUUID(), track: 'judgment', mode: 'rated' },
+        user.token
+      )
+      const set = setRes.data.data.set
+      const setSize = set.size
+
+      for (let slot = 0; slot < setSize; slot++) {
+        const nextRes = await call(`/sets/${set.id}/next`, { transitionId: crypto.randomUUID() }, user.token)
+        expect(nextRes.status).toBe(200)
+        expect(nextRes.data.ok).toBe(true)
+        const attempt = nextRes.data.data
+        expect(attempt.slot).toBe(slot)
+
+        // Real commit with secret answer
+        const [sec] = await testSql`
+          select answer from instance_secrets
+          where instance_id = (select instance_id from attempts where id = ${attempt.id})
+        `
+        const commitRes = await call(
+          `/attempts/${attempt.id}/commit`,
+          {
+            transitionId: crypto.randomUUID(),
+            answer: String(sec.answer),
+            confidence: 0.9,
+            declaredHelp: false,
+          },
+          user.token
         )
-      `
+        expect(commitRes.status).toBe(200)
+        expect(commitRes.data.ok).toBe(true)
+      }
+
+      // Calling next after all slots resolved marks set completed and returns summary
+      const finalNext = await call(`/sets/${set.id}/next`, { transitionId: crypto.randomUUID() }, user.token)
+      expect(finalNext.status).toBe(200)
+      expect(finalNext.data.ok).toBe(true)
+      expect(finalNext.data.data.done).toBe(true)
+      expect(finalNext.data.data.summary).toBeDefined()
+      expect(finalNext.data.data.summary.attempts).toHaveLength(setSize)
+      expect(finalNext.data.data.summary.ratingAfter).toBeGreaterThan(finalNext.data.data.summary.ratingBefore)
+
+      const [closedSet] = await testSql`select * from sets where id = ${set.id}`
+      expect(closedSet.closed_at).not.toBeNull()
+      expect(closedSet.close_reason).toBe('completed')
+    } finally {
+      await testSql`update items set status = 'retired' where id = any(${testItemIds})`
     }
-
-    // Calling next after all slots resolved should mark set completed
-    const finalNext = await call(`/sets/${set.id}/next`, { transitionId: crypto.randomUUID() }, user.token)
-    expect(finalNext.status).toBe(200)
-    expect(finalNext.data.ok).toBe(true)
-    expect(finalNext.data.data.done).toBe(true)
-    expect(finalNext.data.data.summary).toBeDefined()
-
-    const [closedSet] = await testSql`select * from sets where id = ${set.id}`
-    expect(closedSet.closed_at).not.toBeNull()
-    expect(closedSet.close_reason).toBe('completed')
   })
 })

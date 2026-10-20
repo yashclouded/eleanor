@@ -1019,8 +1019,8 @@ Commit: "feat(api): rated commit transaction with echoes, mastery and misconcept
 
 **Done when:**
 
-- [ ] The concurrency test passes 10 times in a row (`for i in $(seq 10); do npm run test:api -- commit || break; done`; paste the tail).
-- [ ] The whole api suite passes.
+- [x] The concurrency test passes 10 times in a row (`for i in $(seq 10); do npm run test:api -- commit || break; done`; paste the tail).
+- [x] The whole api suite passes.
 
 ### Task 3.4: Repair, reveal, and insight
 
