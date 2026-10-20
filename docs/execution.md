@@ -1123,7 +1123,7 @@ Implement, run, paste output. Commit: "feat(api): export, deletion and reports".
 
 **Done when:**
 
-- [ ] The tests pass, including the check that the deleted user's handle can be reused.
+- [x] The tests pass, including the check that the deleted user's handle can be reused.
 
 ---
 

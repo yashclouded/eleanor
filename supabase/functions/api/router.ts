@@ -19,6 +19,13 @@ import {
   handleGetDaily,
   handleGetDailyStats,
 } from './routes/daily.ts'
+import {
+  handleExport,
+  handleDeleteAccount,
+} from './routes/account.ts'
+import {
+  handleCreateReport,
+} from './routes/reports.ts'
 
 export type Ctx = {
   userId: string
@@ -69,6 +76,9 @@ const routes: RouteEntry[] = [
   createRoute('POST', '/attempts/:id/reveal', handleRevealAttempt),
   createRoute('GET', '/daily/stats', handleGetDailyStats),
   createRoute('GET', '/daily', handleGetDaily),
+  createRoute('GET', '/export', handleExport),
+  createRoute('POST', '/account/delete', handleDeleteAccount),
+  createRoute('POST', '/reports', handleCreateReport),
 ]
 
 export async function route(req: Request, ctx: Omit<Ctx, 'params'>): Promise<Response> {
