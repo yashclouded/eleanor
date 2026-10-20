@@ -379,8 +379,8 @@ Implement, run, paste output. Commit: "feat(shared): ERM-1 learner model".
 
 **Done when:**
 
-- [ ] All 8 reference vectors pass within 0.01.
-- [ ] `npm test` and `npm run check` pass.
+- [x] All 8 reference vectors pass within 0.01.
+- [x] `npm test` and `npm run check` pass.
 
 ### Task 1.3: Template contract, catalog, content checker, and two reference templates
 

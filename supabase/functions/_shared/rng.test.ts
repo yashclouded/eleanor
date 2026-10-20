@@ -24,13 +24,19 @@ describe('makeRng', () => {
   it('int(1,6) stays in [1,6] over 10,000 draws and hits every value', () => {
     const rng = makeRng(12345)
     const seen = new Set<number>()
+    let min = Infinity
+    let max = -Infinity
+    let allIntegers = true
     for (let i = 0; i < 10000; i++) {
       const val = rng.int(1, 6)
-      expect(val).toBeGreaterThanOrEqual(1)
-      expect(val).toBeLessThanOrEqual(6)
-      expect(Number.isInteger(val)).toBe(true)
+      if (val < min) min = val
+      if (val > max) max = val
+      if (!Number.isInteger(val)) allIntegers = false
       seen.add(val)
     }
+    expect(min).toBeGreaterThanOrEqual(1)
+    expect(max).toBeLessThanOrEqual(6)
+    expect(allIntegers).toBe(true)
     expect(seen.size).toBe(6)
     for (let i = 1; i <= 6; i++) {
       expect(seen.has(i)).toBe(true)
