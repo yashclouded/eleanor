@@ -582,8 +582,8 @@ Commit: "test(model): simulation gate for ERM-1".
 
 **Done when:**
 
-- [ ] `npm run model:simulate` exits 0 (paste the numbers).
-- [ ] The `--learn=2` drift output is pasted into the commit message body for the record.
+- [x] `npm run model:simulate` exits 0 (paste the numbers).
+- [x] The `--learn=2` drift output is pasted into the commit message body for the record.
 
 ---
 

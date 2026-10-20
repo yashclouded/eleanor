@@ -20,7 +20,8 @@
     "db:types": "supabase gen types typescript --local > src/lib/database.types.ts",
     "functions:serve": "supabase functions serve --env-file supabase/.env.local",
     "content:check": "tsx scripts/content-check.ts",
-    "content:preview": "tsx scripts/content-preview.ts"
+    "content:preview": "tsx scripts/content-preview.ts",
+    "model:simulate": "tsx scripts/simulate.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.2",
