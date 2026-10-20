@@ -213,8 +213,8 @@ Before writing config, fetch the current Supabase docs (context7 or supabase.com
 
 **Done when:**
 
-- [ ] `npx supabase status` shows a running stack (paste the redacted output).
-- [ ] `npm run dev` serves the page and the console shows no Supabase env errors.
+- [x] `npx supabase status` shows a running stack (paste the redacted output).
+- [x] `npm run dev` serves the page and the console shows no Supabase env errors.
 
 ---
 

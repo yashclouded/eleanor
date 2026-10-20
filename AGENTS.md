@@ -2,7 +2,10 @@
 
 ## Context
 
-- Node v22.11.0, npm 10.9.0. Task 0.1 landed (Vite React TS toolchain scaffolded).
+- Node v22.11.0, npm 10.9.0. Task 0.2 landed (Local Supabase stack and auth configured).
+- Docker Desktop is required for the local Supabase stack (`npm run db:start`, `npm run db:stop`, `npm run db:reset`).
+- Local credentials come from `npx supabase status` (or `npx supabase status -o pretty`) and are placed in `.env.local` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`).
+- Local emails (magic links, OTP) are captured by Mailpit at `http://127.0.0.1:54324` (printed by `supabase status`).
 - Where to find things:
   - [docs/execution.md](docs/execution.md): what to build next, with each task's contracts, tests, and prompt.
   - [doc.md](doc.md): product behaviour and the learner model (ERM-1).
@@ -39,7 +42,7 @@
 
 ## Commands
 
-`npm ci` · `npm run dev` · `npm run build` · `npm run typecheck` · `npm run lint` · `npm run check` · `npm test` · `npm run test:watch`
+`npm ci` · `npm run dev` · `npm run build` · `npm run typecheck` · `npm run lint` · `npm run check` · `npm test` · `npm run test:watch` · `npm run db:start` · `npm run db:stop` · `npm run db:reset` · `npm run db:types` · `npm run functions:serve`
 
 ## Non-negotiables
 

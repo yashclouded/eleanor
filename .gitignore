@@ -7,7 +7,9 @@ build/
 
 # Environment files
 .env*
+!.env.example
 supabase/.env*
+!supabase/.env.example
 
 # Test and report artifacts
 playwright-report/
