@@ -892,8 +892,8 @@ Commit: "feat(api): edge function skeleton, idempotent transitions, onboarding".
 
 **Done when:**
 
-- [ ] `npm run test:api` passes the onboarding and transition tests.
-- [ ] `npm run check` includes `deno check` and passes.
+- [x] `npm run test:api` passes the onboarding and transition tests.
+- [x] `npm run check` includes `deno check` and passes.
 
 ### Task 3.2: Sets and next problem
 

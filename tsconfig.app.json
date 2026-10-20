@@ -19,7 +19,11 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "npm:postgres@*": ["./node_modules/postgres"],
+      "npm:@supabase/server@*": ["./node_modules/@supabase/server"]
+    }
   },
   "include": [
     "src",
