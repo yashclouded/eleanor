@@ -821,8 +821,8 @@ Commit: "feat(content): database sync and admin script".
 
 **Done when:**
 
-- [ ] Running sync twice in a row changes nothing the second time (paste both outputs).
-- [ ] The `planSync` tests pass.
+- [x] Running sync twice in a row changes nothing the second time (paste both outputs).
+- [x] The `planSync` tests pass.
 
 ---
 
