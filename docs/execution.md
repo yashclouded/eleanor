@@ -1196,8 +1196,8 @@ Run npm run test:e2e -- auth and paste output. Commit: "feat(web): shell, auth a
 
 **Done when:**
 
-- [ ] The e2e test passes, keyboard only.
-- [ ] `axe` reports no serious violations on Login or any onboarding step (add `@axe-core/playwright` checks).
+- [x] The e2e test passes, keyboard only.
+- [x] `axe` reports no serious violations on Login or any onboarding step (add `@axe-core/playwright` checks).
 
 ### Task 4.2: Set player
 

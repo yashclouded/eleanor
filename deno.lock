@@ -1789,7 +1789,9 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@axe-core/playwright@4.10.1",
         "npm:@eslint/js@9.25.0",
+        "npm:@playwright/test@1.50.1",
         "npm:@supabase/supabase-js@2.117.2",
         "npm:@types/node@22.13.4",
         "npm:@types/react-dom@19.0.4",
@@ -1801,6 +1803,7 @@
         "npm:globals@15.15.0",
         "npm:postgres@^3.4.9",
         "npm:react-dom@19.0.0",
+        "npm:react-router-dom@6.28.2",
         "npm:react@19.0.0",
         "npm:supabase@2.119.0",
         "npm:tsx@4.19.3",
