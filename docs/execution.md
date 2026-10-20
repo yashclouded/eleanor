@@ -791,8 +791,8 @@ Commit: "feat(db): schema, RLS and database tests".
 
 **Done when:**
 
-- [ ] `npm run test:db` passes every assertion above.
-- [ ] `src/lib/database.types.ts` is generated and committed.
+- [x] `npm run test:db` passes every assertion above.
+- [x] `src/lib/database.types.ts` is generated and committed.
 
 ### Task 2.2: Content sync, seed, and admin script
 
