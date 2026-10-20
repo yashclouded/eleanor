@@ -41,7 +41,7 @@ export type AttemptView = {
   }
 }
 
-function parseJsonIfNeeded<T>(val: T | string): T {
+export function parseJsonIfNeeded<T>(val: T | string): T {
   if (typeof val === 'string') {
     try {
       return JSON.parse(val)
@@ -443,22 +443,22 @@ export async function handleGetAttempt(ctx: Ctx): Promise<Response> {
 
     if (attempt.state === 'revealed') {
       const [pb] = await sql`
-        select note from playbook where user_id = ${ctx.userId} and concept_id = ${attempt.concept_id}
+        select text from playbook where user_id = ${ctx.userId} and attempt_id = ${attempt.id}
       `
-      playbookNote = pb?.note ?? null
+      playbookNote = pb?.text ?? null
 
       if (attempt.kind === 'echo') {
         const [en] = await sql`
-          select p.note
+          select p.text
           from attempts a
-          join playbook p on p.user_id = a.user_id and p.concept_id = a.concept_id
+          join playbook p on p.attempt_id = a.id
           where a.user_id = ${ctx.userId}
             and a.family_id = ${attempt.family_id}
             and a.id != ${attempt.id}
           order by a.presented_at desc
           limit 1
         `
-        earlierNote = en?.note ?? null
+        earlierNote = en?.text ?? null
       }
     }
   }

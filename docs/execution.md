@@ -1056,7 +1056,7 @@ Implement, run the api suite, paste output. Commit: "feat(api): repair ladder an
 
 **Done when:**
 
-- [ ] The tests pass.
+- [x] The tests pass.
 
 ### Task 3.5: Daily Crux and crowd stats
 

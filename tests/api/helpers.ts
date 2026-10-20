@@ -55,6 +55,13 @@ export async function createTestUser(emailPrefix = 'user') {
   }
 }
 
+export function createUserClient(token: string) {
+  return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  })
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface ApiResponse<T = any> {
   status: number

@@ -12,6 +12,8 @@ import {
 import {
   handleCommitAttempt,
   handleGiveUpAttempt,
+  handleRepairAttempt,
+  handleRevealAttempt,
 } from './routes/attempts.ts'
 
 export type Ctx = {
@@ -59,6 +61,8 @@ const routes: RouteEntry[] = [
   createRoute('GET', '/attempts/:id', handleGetAttempt),
   createRoute('POST', '/attempts/:id/commit', handleCommitAttempt),
   createRoute('POST', '/attempts/:id/give-up', handleGiveUpAttempt),
+  createRoute('POST', '/attempts/:id/repair', handleRepairAttempt),
+  createRoute('POST', '/attempts/:id/reveal', handleRevealAttempt),
 ]
 
 export async function route(req: Request, ctx: Omit<Ctx, 'params'>): Promise<Response> {
