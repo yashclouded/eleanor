@@ -19,7 +19,7 @@ import { Daily } from './pages/Daily.tsx'
 import { Progress } from './pages/Progress.tsx'
 import { Playbook } from './pages/Playbook.tsx'
 import { Leaderboard } from './pages/Leaderboard.tsx'
-import { PublicProfile } from './pages/PublicProfile.tsx'
+import { Profile } from './pages/Profile.tsx'
 import { Settings } from './pages/Settings.tsx'
 import { Admin } from './pages/Admin.tsx'
 import { Terms } from './pages/Terms.tsx'
@@ -190,7 +190,7 @@ export function AppContent() {
             <Route path="/playbook" element={<Playbook />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/leaderboard/:track" element={<Leaderboard />} />
-            <Route path="/u/:handle" element={<PublicProfile />} />
+            <Route path="/u/:handle" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/terms" element={<Terms />} />

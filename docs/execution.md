@@ -1327,7 +1327,7 @@ Implement, run, paste output. Commit: "feat(web): leaderboards and public profil
 
 **Done when:**
 
-- [ ] The e2e cases pass signed out and signed in.
+- [x] The e2e cases pass signed out and signed in.
 
 ### Task 4.6: Settings, landing, and legal pages
 

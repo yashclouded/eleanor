@@ -17,6 +17,7 @@ export interface Profile {
   weekly_goal: number
   tracks: string[]
   created_at: string
+  banned_at?: string | null
 }
 
 interface AuthContextValue {
