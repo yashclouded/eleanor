@@ -9,6 +9,7 @@ export default defineConfig({
     include: [
       'supabase/functions/_shared/**/*.test.ts',
       'scripts/**/*.test.ts',
+      'src/**/*.test.{ts,tsx}',
     ],
     exclude: ['tests/api/**', 'tests/e2e/**', 'node_modules/**'],
   },

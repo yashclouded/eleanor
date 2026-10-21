@@ -1306,8 +1306,8 @@ Implement, run, paste output. Commit: "feat(web): progress, concept map, calibra
 
 **Done when:**
 
-- [ ] The tests pass.
-- [ ] Brier is never rendered without calibration error, gap, and N (asserted).
+- [x] The tests pass.
+- [x] Brier is never rendered without calibration error, gap, and N (asserted).
 
 ### Task 4.5: Leaderboards and public profiles
 
