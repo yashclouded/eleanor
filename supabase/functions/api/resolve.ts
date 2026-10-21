@@ -394,6 +394,19 @@ export async function resolveAttempt(
       : secSteps.steps
     : []
 
+  let repair: { index: number; prompt: any; tolerance: any } | null = null
+  if (
+    (a.outcome === 'incorrect' || a.outcome === 'gave_up') &&
+    Array.isArray(stepsList) &&
+    stepsList.length > 0
+  ) {
+    repair = {
+      index: 0,
+      prompt: stepsList[0].prompt,
+      tolerance: stepsList[0].tolerance,
+    }
+  }
+
   return {
     outcome: a.outcome,
     answer: a.answer,
@@ -404,5 +417,6 @@ export async function resolveAttempt(
     ratingDelta,
     repairStep: 0,
     repairTotal: Array.isArray(stepsList) ? stepsList.length : 0,
+    repair,
   }
 }

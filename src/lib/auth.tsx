@@ -11,7 +11,7 @@ export interface Profile {
   leaderboard_visible: boolean
   intensity: 'steady' | 'balanced' | 'stretch'
   set_size: number
-  rating_reveal: 'immediate' | 'end_of_set'
+  rating_reveal: 'each' | 'end_of_set'
   reduced_motion: boolean
   theme: 'system' | 'light' | 'dark'
   weekly_goal: number

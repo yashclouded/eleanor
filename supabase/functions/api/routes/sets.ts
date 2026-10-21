@@ -31,6 +31,7 @@ export type AttemptView = {
     ratingDelta: number | null
     repairStep: number
     repairTotal: number
+    repair?: { index: number; prompt: Block[]; tolerance: Tolerance } | null
   }
   repair?: { index: number; prompt: Block[]; tolerance: Tolerance } | null
   reveal?: {
@@ -87,6 +88,8 @@ export function toAttemptView(
       }
     }
 
+    const stepsList = secrets?.steps ? parseJsonIfNeeded(secrets.steps) : []
+
     view.result = {
       outcome: attempt.outcome,
       answer: attempt.answer ?? null,
@@ -96,7 +99,22 @@ export function toAttemptView(
       itemRating: attempt.item_rating ?? null,
       ratingDelta: attempt.rating_delta ?? null,
       repairStep: attempt.repair_step ?? 0,
-      repairTotal: secrets?.steps?.length ?? 0,
+      repairTotal: Array.isArray(stepsList) ? stepsList.length : 0,
+    }
+
+    const stepIndex = attempt.repair_step ?? 0
+    if (
+      attempt.state === 'resolved' &&
+      Array.isArray(stepsList) &&
+      (attempt.outcome === 'incorrect' || attempt.outcome === 'gave_up') &&
+      stepIndex < stepsList.length
+    ) {
+      const step = stepsList[stepIndex]
+      view.repair = {
+        index: stepIndex,
+        prompt: step.prompt,
+        tolerance: step.tolerance,
+      }
     }
   }
 
@@ -246,12 +264,16 @@ export async function handleCreateSet(ctx: Ctx): Promise<Response> {
 
 interface NextProblemBody {
   transitionId: string
+  resume?: boolean
 }
 
 function isNextProblemBody(x: unknown): x is NextProblemBody {
   if (!x || typeof x !== 'object') return false
   const b = x as Record<string, unknown>
-  return isUuid(b.transitionId)
+  return (
+    isUuid(b.transitionId) &&
+    (b.resume === undefined || typeof b.resume === 'boolean')
+  )
 }
 
 export async function handleNextProblem(ctx: Ctx): Promise<Response> {
@@ -263,7 +285,7 @@ export async function handleNextProblem(ctx: Ctx): Promise<Response> {
 
   return await sql.begin(async (tx) => {
     const [set] = await tx`
-      select * from sets where id = ${setId}
+      select * from sets where id = ${setId} for update
     `
     if (!set || set.user_id !== ctx.userId) {
       throw new HttpError('not_found', 'Set not found')
@@ -283,6 +305,60 @@ export async function handleNextProblem(ctx: Ctx): Promise<Response> {
       where a.set_id = ${setId}
       order by a.slot asc
     `
+
+    // Resume logic: if resume is requested, return current slot state (presented, resolved, revealed)
+    if (b.resume && existingAttempts.length > 0) {
+      const current = existingAttempts[existingAttempts.length - 1]
+      if (current.state === 'presented' || current.state === 'judging') {
+        const view = toAttemptView(
+          current,
+          current,
+          { id: current.concept_id, name: current.concept_name }
+        )
+        return ok(view)
+      }
+
+      // If resolved or revealed, load secrets and notes for full view
+      let secrets = null
+      let earlierNote: string | null = null
+      let playbookNote: string | null = null
+
+      const [sec] = await tx`
+        select * from instance_secrets where instance_id = ${current.instance_id}
+      `
+      secrets = sec
+
+      if (current.state === 'revealed') {
+        const [pb] = await tx`
+          select text from playbook where user_id = ${ctx.userId} and attempt_id = ${current.id}
+        `
+        playbookNote = pb?.text ?? null
+
+        if (current.kind === 'echo') {
+          const [en] = await tx`
+            select p.text
+            from attempts a
+            join playbook p on p.user_id = a.user_id and p.attempt_id = a.id
+            where a.user_id = ${ctx.userId}
+              and a.family_id = ${current.family_id}
+              and a.id != ${current.id}
+            order by a.presented_at desc
+            limit 1
+          `
+          earlierNote = en?.text ?? null
+        }
+      }
+
+      const view = toAttemptView(
+        current,
+        current,
+        { id: current.concept_id, name: current.concept_name },
+        secrets,
+        earlierNote,
+        playbookNote
+      )
+      return ok(view)
+    }
 
     // If current slot's attempt is not yet resolved, return it (no reroll)
     if (existingAttempts.length > 0) {

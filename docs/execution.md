@@ -1249,8 +1249,8 @@ Then implement. Run and paste output. Commit: "feat(web): set player with repair
 
 **Done when:**
 
-- [ ] All 7 e2e cases pass.
-- [ ] The network-abort test shows one rating-event set.
+- [x] All 7 e2e cases pass.
+- [x] The network-abort test shows one rating-event set.
 
 ### Task 4.3: Today and Daily Crux pages
 

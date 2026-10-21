@@ -1,4 +1,37 @@
 import { supabase } from './supabase.ts'
+import type { TrackId, Block, AnswerSpec, Answer, Tolerance } from '../../supabase/functions/_shared/content/types.ts'
+
+export type AttemptView = {
+  id: string
+  setId: string | null
+  slot: number | null
+  kind: string
+  rated: boolean
+  state: string
+  track: TrackId
+  concept: { id: string; name: string }
+  prompt: Block[]
+  answerSpec: AnswerSpec
+  result?: {
+    outcome: 'correct' | 'incorrect' | 'gave_up' | 'abandoned'
+    answer: Answer | null
+    confidence: number | null
+    misconception: { id: string; feedback: string } | null
+    forecast: number | null
+    itemRating: number | null
+    ratingDelta: number | null
+    repairStep: number
+    repairTotal: number
+    repair?: { index: number; prompt: Block[]; tolerance: Tolerance } | null
+  }
+  repair?: { index: number; prompt: Block[]; tolerance: Tolerance } | null
+  reveal?: {
+    solution: Block[]
+    answer: Answer
+    playbookNote: string | null
+    earlierNote: string | null
+  }
+}
 
 export class ApiError extends Error {
   code: string
