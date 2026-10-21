@@ -1275,7 +1275,7 @@ Implement, run, paste output. Commit: "feat(web): Today and Daily Crux pages".
 
 **Done when:**
 
-- [ ] The e2e cases pass.
+- [x] The e2e cases pass.
 
 ### Task 4.4: Progress and Playbook
 

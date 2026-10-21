@@ -11,7 +11,7 @@ export function PromptBlocks({ blocks, className = '' }: PromptBlocksProps) {
   }
 
   return (
-    <div className={`prompt-blocks ${className}`.trim()}>
+    <div className={`prompt-blocks ${className}`.trim()} data-testid="prompt-blocks">
       {blocks.map((block, idx) => {
         switch (block.t) {
           case 'p':
