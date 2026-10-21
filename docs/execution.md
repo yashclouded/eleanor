@@ -1355,7 +1355,7 @@ Implement, run, paste output. Commit: "feat(web): settings, landing and legal dr
 
 **Done when:**
 
-- [ ] The e2e cases pass.
+- [x] The e2e cases pass.
 - [ ] 🔒 The owner reviews the legal drafts before task 8.4.
 
 ---

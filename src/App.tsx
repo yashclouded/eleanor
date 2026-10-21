@@ -24,6 +24,7 @@ import { Settings } from './pages/Settings.tsx'
 import { Admin } from './pages/Admin.tsx'
 import { Terms } from './pages/Terms.tsx'
 import { Privacy } from './pages/Privacy.tsx'
+import { Legal } from './pages/Legal.tsx'
 
 function TopBar() {
   const { session, profile, signOut } = useAuth()
@@ -76,6 +77,14 @@ function TopBar() {
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
                   Leaderboard
+                </NavLink>
+              </li>
+              <li>
+                <NavLink
+                  to="/settings"
+                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                >
+                  Settings
                 </NavLink>
               </li>
             </ul>
@@ -143,6 +152,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     path === '/' ||
     path === '/terms' ||
     path === '/privacy' ||
+    path === '/legal' ||
     path.startsWith('/u/') ||
     path.startsWith('/leaderboard')
 
@@ -195,6 +205,7 @@ export function AppContent() {
             <Route path="/admin" element={<Admin />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/legal" element={<Legal />} />
             {/* Catch-all fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
