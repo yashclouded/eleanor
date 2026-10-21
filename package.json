@@ -24,6 +24,7 @@
     "functions:serve": "supabase functions serve --env-file supabase/.env.local",
     "content:check": "tsx scripts/content-check.ts",
     "content:preview": "tsx scripts/content-preview.ts",
+    "content:code:build": "DEVELOPER_DIR=/Library/Developer/CommandLineTools tsx scripts/code-build.ts",
     "content:sync": "tsx scripts/content-sync.ts",
     "model:simulate": "tsx scripts/simulate.ts"
   },

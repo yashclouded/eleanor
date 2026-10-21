@@ -1,0 +1,36 @@
+#include <iostream>
+#include <vector>
+
+using namespace std;
+
+// WRONG SOLUTION: Uses 32-bit int for prefix sums instead of 64-bit int
+void solve() {
+    int n, q;
+    if (!(cin >> n >> q)) return;
+
+    vector<int> pref(n + 1, 0); // 32-bit int overflow!
+    for (int i = 1; i <= n; i++) {
+        int val;
+        cin >> val;
+        pref[i] = pref[i - 1] + val;
+    }
+
+    for (int j = 0; j < q; j++) {
+        int l, r;
+        cin >> l >> r;
+        cout << (pref[r] - pref[l - 1]) << "\n";
+    }
+}
+
+int main() {
+    ios_base::sync_with_stdio(false);
+    cin.tie(NULL);
+
+    int t;
+    if (cin >> t) {
+        while (t--) {
+            solve();
+        }
+    }
+    return 0;
+}

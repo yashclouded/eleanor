@@ -1,7 +1,15 @@
 import type { ConceptCard, Template } from './content/types.ts'
+import type { CodeProblem } from './content/code/types.ts'
 import { baseRateScreeningTemplate } from './content/judgment/base-rate-screening.ts'
 import { knightsTwoTemplate } from './content/logic/knights-two.ts'
 import { JUDGMENT_CARDS } from './content/cards/judgment.ts'
+import { rangeSumsProblem } from './content/code/code.prefix.range-sums.ts'
+import { robotWalkProblem } from './content/code/code.implementation.robot-walk.ts'
+
+export const CODE_PROBLEMS: CodeProblem[] = [
+  rangeSumsProblem,
+  robotWalkProblem,
+]
 
 /**
  * Heterogeneous list of all content templates in the bank.

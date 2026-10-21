@@ -3,6 +3,7 @@ import { checkAll, checkBank, checkTemplate } from './content-check.ts'
 import { CONCEPTS } from '../supabase/functions/_shared/catalog.ts'
 import { TEMPLATES } from '../supabase/functions/_shared/registry.ts'
 import type { Concept, Template } from '../supabase/functions/_shared/content/types.ts'
+import type { CodeProblem } from '../supabase/functions/_shared/content/code/types.ts'
 
 // Minimal valid fake template base
 function createValidFakeTemplate(): Template<{ val: number }> {
@@ -138,8 +139,38 @@ describe('content-check suite', () => {
     ).toBe(true)
   })
 
-  it('passes on the real bank templates and catalog concepts', () => {
+  it('passes on the real bank templates, code problems, and catalog concepts', () => {
     const errors = checkAll(TEMPLATES, CONCEPTS, 200)
     expect(errors).toEqual([])
+  })
+
+  it('detects code problems with invalid wrong solution groups or missing samples', () => {
+    const invalidProblem: CodeProblem = {
+      id: 'code.test.invalid',
+      version: 1,
+      slug: 'code.test.invalid',
+      concept: 'code.implementation',
+      family: 'test-invalid',
+      status: 'draft',
+      review: { author: 'test', reviewer: null, reviewedAt: null },
+      initialRating: 800,
+      statement: [{ t: 'p', text: 'statement' }],
+      inputFormat: [{ t: 'p', text: 'input' }],
+      outputFormat: [{ t: 'p', text: 'output' }],
+      constraints: [{ t: 'p', text: 'constraints' }],
+      samples: [], // empty samples
+      groups: [{ label: 'samples', fingerprint: 'fp' }],
+      limits: { cpuSeconds: 2.0, memoryKb: 256000 },
+      checker: { kind: 'tokens' },
+      editorial: [{ t: 'p', text: 'editorial' }],
+      wrong: [
+        { file: 'wrong_1.py', failsGroup: 5 }, // invalid group 5
+        { file: 'wrong_2.py', failsGroup: 0 },
+      ],
+    }
+
+    const errors = checkAll([], CONCEPTS, 1, [invalidProblem])
+    expect(errors.some((e) => e.includes('must have at least one sample test'))).toBe(true)
+    expect(errors.some((e) => e.includes('declares invalid failsGroup 5'))).toBe(true)
   })
 })

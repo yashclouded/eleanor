@@ -1411,8 +1411,8 @@ Commit: "feat(code): problem format, test builder and reference problems".
 
 **Done when:**
 
-- [ ] Both wrong solutions fail exactly where declared. The reference solution passes within half the limit.
-- [ ] `compare` tests pass.
+- [x] Both wrong solutions fail exactly where declared. The reference solution passes within half the limit.
+- [x] `compare` tests pass.
 
 ### Task 5.2: Judge0 integration in the API
 

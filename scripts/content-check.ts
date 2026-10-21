@@ -1,8 +1,9 @@
 import { isCorrect } from '../supabase/functions/_shared/grading.ts'
 import { hashSeed, makeRng } from '../supabase/functions/_shared/rng.ts'
 import { CONCEPTS } from '../supabase/functions/_shared/catalog.ts'
-import { TEMPLATES } from '../supabase/functions/_shared/registry.ts'
+import { TEMPLATES, CODE_PROBLEMS } from '../supabase/functions/_shared/registry.ts'
 import type { Concept, Template } from '../supabase/functions/_shared/content/types.ts'
+import type { CodeProblem } from '../supabase/functions/_shared/content/code/types.ts'
 
 /**
  * Checks bank-level rules on templates and concepts.
@@ -259,13 +260,104 @@ export function checkTemplate(template: Template<any>, seedCount = 2000): string
 }
 
 /**
- * Checks all templates and bank configuration.
+ * Checks metadata rules on a code problem.
+ * Metadata rules: <= 12 groups, samples present, limits set, every wrong solution's group exists.
+ */
+export function checkCodeProblem(problem: CodeProblem, concepts: Concept[]): string[] {
+  const errors: string[] = []
+  const conceptMap = new Map(concepts.map((c) => [c.id, c]))
+
+  if (!problem.id || typeof problem.id !== 'string') {
+    errors.push(`Code problem has invalid id: ${problem.id}`)
+  }
+
+  if (!problem.version || problem.version < 1) {
+    errors.push(`Code problem ${problem.id} has invalid version: ${problem.version}`)
+  }
+
+  const concept = conceptMap.get(problem.concept)
+  if (!concept) {
+    errors.push(`Code problem ${problem.id} references non-existent concept: ${problem.concept}`)
+  } else if (concept.track !== 'code') {
+    errors.push(`Code problem ${problem.id} references non-code concept: ${problem.concept}`)
+  }
+
+  if (!problem.statement || problem.statement.length === 0) {
+    errors.push(`Code problem ${problem.id} missing statement blocks`)
+  }
+
+  if (!problem.inputFormat || problem.inputFormat.length === 0) {
+    errors.push(`Code problem ${problem.id} missing inputFormat blocks`)
+  }
+
+  if (!problem.outputFormat || problem.outputFormat.length === 0) {
+    errors.push(`Code problem ${problem.id} missing outputFormat blocks`)
+  }
+
+  if (!problem.constraints || problem.constraints.length === 0) {
+    errors.push(`Code problem ${problem.id} missing constraints blocks`)
+  }
+
+  // Samples present
+  if (!problem.samples || problem.samples.length === 0) {
+    errors.push(`Code problem ${problem.id} must have at least one sample test`)
+  }
+
+  // Groups <= 12 and >= 1
+  if (!problem.groups || problem.groups.length < 1 || problem.groups.length > 12) {
+    errors.push(
+      `Code problem ${problem.id} must have between 1 and 12 test groups (has ${problem.groups?.length})`,
+    )
+  }
+
+  // Limits set
+  if (!problem.limits || problem.limits.cpuSeconds <= 0 || problem.limits.memoryKb <= 0) {
+    errors.push(`Code problem ${problem.id} must specify positive cpuSeconds and memoryKb limits`)
+  }
+
+  // Checker set
+  if (!problem.checker) {
+    errors.push(`Code problem ${problem.id} missing checker configuration`)
+  }
+
+  // Every wrong solution's group exists
+  if (!problem.wrong || problem.wrong.length < 2) {
+    errors.push(`Code problem ${problem.id} must declare at least 2 known-wrong solutions`)
+  } else {
+    for (const w of problem.wrong) {
+      if (
+        w.failsGroup < 0 ||
+        !problem.groups ||
+        w.failsGroup >= problem.groups.length
+      ) {
+        errors.push(
+          `Code problem ${problem.id} wrong solution '${w.file}' declares invalid failsGroup ${w.failsGroup} (groups length is ${problem.groups?.length})`,
+        )
+      }
+    }
+  }
+
+  // Published rules
+  if (problem.status === 'published') {
+    if (!problem.review?.reviewer || !problem.review?.reviewedAt) {
+      errors.push(
+        `Code problem ${problem.id} is marked 'published' but missing reviewer or reviewedAt`,
+      )
+    }
+  }
+
+  return errors
+}
+
+/**
+ * Checks all templates, code problems, and bank configuration.
  */
 export function checkAll(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   templates: Template<any>[] = TEMPLATES,
   concepts: Concept[] = CONCEPTS,
   seedCount = 2000,
+  codeProblems: CodeProblem[] = CODE_PROBLEMS,
 ): string[] {
   const errors: string[] = []
   errors.push(...checkBank(templates, concepts))
@@ -274,13 +366,17 @@ export function checkAll(
     errors.push(...checkTemplate(t, seedCount))
   }
 
+  for (const p of codeProblems) {
+    errors.push(...checkCodeProblem(p, concepts))
+  }
+
   return errors
 }
 
 // CLI entry point
 if (process.argv[1]?.endsWith('content-check.ts')) {
   console.log('Running Eleanor content checks...')
-  const errors = checkAll(TEMPLATES, CONCEPTS, 2000)
+  const errors = checkAll(TEMPLATES, CONCEPTS, 2000, CODE_PROBLEMS)
 
   if (errors.length > 0) {
     console.error(`\n❌ Content checks failed with ${errors.length} error(s):`)
@@ -289,7 +385,9 @@ if (process.argv[1]?.endsWith('content-check.ts')) {
     }
     process.exit(1)
   } else {
-    console.log(`\n✅ All content checks passed successfully (${TEMPLATES.length} templates checked).`)
+    console.log(
+      `\n✅ All content checks passed successfully (${TEMPLATES.length} templates, ${CODE_PROBLEMS.length} code problems checked).`,
+    )
     process.exit(0)
   }
 }
