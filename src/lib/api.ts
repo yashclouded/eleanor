@@ -23,6 +23,8 @@ export type AttemptView = {
     repairStep: number
     repairTotal: number
     repair?: { index: number; prompt: Block[]; tolerance: Tolerance } | null
+    verdict?: string | null
+    failedGroupLabel?: string | null
   }
   repair?: { index: number; prompt: Block[]; tolerance: Tolerance } | null
   reveal?: {
@@ -30,6 +32,8 @@ export type AttemptView = {
     answer: Answer
     playbookNote: string | null
     earlierNote: string | null
+    editorial?: Block[]
+    referenceSolutions?: Record<string, string>
   }
 }
 

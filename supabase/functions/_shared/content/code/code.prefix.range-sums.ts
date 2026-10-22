@@ -103,4 +103,98 @@ export const rangeSumsProblem: CodeProblem = {
     { file: 'wrong_overflow.cpp', failsGroup: 3 },
     { file: 'wrong_slow.py', failsGroup: 4 },
   ],
+  referenceSolutions: {
+    cpp: `#include <iostream>
+#include <vector>
+
+using namespace std;
+
+void solve() {
+    int n, q;
+    if (!(cin >> n >> q)) return;
+    vector<long long> a(n);
+    vector<long long> p(n + 1, 0);
+    for (int i = 0; i < n; i++) {
+        cin >> a[i];
+        p[i + 1] = p[i] + a[i];
+    }
+    for (int i = 0; i < q; i++) {
+        int l, r;
+        cin >> l >> r;
+        cout << (p[r] - p[l - 1]) << "\\n";
+    }
+}
+
+int main() {
+    ios_base::sync_with_stdio(false);
+    cin.tie(NULL);
+    int t;
+    if (cin >> t) {
+        while (t--) {
+            solve();
+        }
+    }
+    return 0;
+}`,
+    python: `import sys
+
+def main():
+    input_data = sys.stdin.read().split()
+    if not input_data:
+        return
+    ptr = 0
+    t = int(input_data[ptr])
+    ptr += 1
+    out = []
+    for _ in range(t):
+        n = int(input_data[ptr])
+        q = int(input_data[ptr + 1])
+        ptr += 2
+        p = [0] * (n + 1)
+        for i in range(n):
+            p[i + 1] = p[i] + int(input_data[ptr + i])
+        ptr += n
+        for _ in range(q):
+            l = int(input_data[ptr])
+            r = int(input_data[ptr + 1])
+            ptr += 2
+            out.append(str(p[r] - p[l - 1]))
+    sys.stdout.write("\\n".join(out) + "\\n")
+
+if __name__ == "__main__":
+    main()`,
+    javascript: `const fs = require('fs');
+
+function main() {
+    const input = fs.readFileSync(0, 'utf-8');
+    let pos = 0;
+    function nextToken() {
+        while (pos < input.length && input.charCodeAt(pos) <= 32) pos++;
+        if (pos >= input.length) return null;
+        const start = pos;
+        while (pos < input.length && input.charCodeAt(pos) > 32) pos++;
+        return input.slice(start, pos);
+    }
+    const tStr = nextToken();
+    if (!tStr) return;
+    const t = parseInt(tStr, 10);
+    const out = [];
+    for (let tc = 0; tc < t; tc++) {
+        const n = parseInt(nextToken(), 10);
+        const q = parseInt(nextToken(), 10);
+        const p = new BigInt64Array(n + 1);
+        for (let i = 0; i < n; i++) {
+            p[i + 1] = p[i] + BigInt(nextToken());
+        }
+        for (let i = 0; i < q; i++) {
+            const l = parseInt(nextToken(), 10);
+            const r = parseInt(nextToken(), 10);
+            out.push((p[r] - p[l - 1]).toString());
+        }
+    }
+    process.stdout.write(out.join('\\n') + '\\n');
+}
+
+main();`,
+  },
 }

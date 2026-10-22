@@ -23,4 +23,5 @@ export type CodeProblem = {
   checker: CodeChecker
   editorial: Block[]
   wrong: { file: string; failsGroup: number }[] // declared expectations for known-wrong solutions
+  referenceSolutions?: Record<string, string>
 }

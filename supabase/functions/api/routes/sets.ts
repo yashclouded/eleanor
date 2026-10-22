@@ -5,7 +5,7 @@ import { withTransition } from '../transition.ts'
 import { loadSelectionInput, type SetDbRow } from '../load.ts'
 import { selectSlot, unlocked, priority, type ConceptState } from '../../_shared/select.ts'
 import { hashSeed, makeRng } from '../../_shared/rng.ts'
-import { templateFor } from '../../_shared/registry.ts'
+import { templateFor, CODE_PROBLEMS } from '../../_shared/registry.ts'
 import { buildInstance } from '../../_shared/instance.ts'
 import type { TrackId, Block, AnswerSpec, Answer, Tolerance } from '../../_shared/content/types.ts'
 import type { Ctx } from '../router.ts'
@@ -32,6 +32,8 @@ export type AttemptView = {
     repairStep: number
     repairTotal: number
     repair?: { index: number; prompt: Block[]; tolerance: Tolerance } | null
+    verdict?: string | null
+    failedGroupLabel?: string | null
   }
   repair?: { index: number; prompt: Block[]; tolerance: Tolerance } | null
   reveal?: {
@@ -39,6 +41,8 @@ export type AttemptView = {
     answer: Answer
     playbookNote: string | null
     earlierNote: string | null
+    editorial?: Block[]
+    referenceSolutions?: Record<string, string>
   }
 }
 
@@ -59,7 +63,13 @@ export function toAttemptView(
   concept: { id: string; name: string },
   secrets?: any,
   earlierNote: string | null = null,
-  playbookNote: string | null = null
+  playbookNote: string | null = null,
+  codeInfo?: {
+    verdict?: string | null
+    failedGroupLabel?: string | null
+    editorial?: Block[]
+    referenceSolutions?: Record<string, string>
+  }
 ): AttemptView {
   const view: AttemptView = {
     id: attempt.id,
@@ -100,6 +110,8 @@ export function toAttemptView(
       ratingDelta: attempt.rating_delta ?? null,
       repairStep: attempt.repair_step ?? 0,
       repairTotal: Array.isArray(stepsList) ? stepsList.length : 0,
+      verdict: codeInfo?.verdict ?? null,
+      failedGroupLabel: codeInfo?.failedGroupLabel ?? null,
     }
 
     const stepIndex = attempt.repair_step ?? 0
@@ -124,6 +136,8 @@ export function toAttemptView(
       answer: secrets.answer,
       playbookNote,
       earlierNote: attempt.kind === 'echo' ? earlierNote : null,
+      editorial: codeInfo?.editorial,
+      referenceSolutions: codeInfo?.referenceSolutions,
     }
   }
 
@@ -410,43 +424,79 @@ export async function handleNextProblem(ctx: Ctx): Promise<Response> {
         }
 
         const [item] = await tx`
-          select family_id from items where id = ${selection.itemId}
-        `
-        const { template, level } = templateFor(selection.itemId)
-
-        // Select skin not used in last 5 attempts on that template
-        const recentAttempts = await tx`
-          select i.skin
-          from attempts a
-          join instances i on a.instance_id = i.id
-          where a.user_id = ${ctx.userId}
-            and a.item_id like ${template.id + '@' + template.version + '%'}
-          order by a.presented_at desc
-          limit 5
-        `
-        const usedSkins = new Set(recentAttempts.map((r) => r.skin))
-        const availableSkins = template.skins.filter((s: string) => !usedSkins.has(s))
-        const skinPool = availableSkins.length > 0 ? availableSkins : template.skins
-        const skinRng = makeRng(hashSeed(set.id, slot, 'skin'))
-        const chosenSkin = skinPool[Math.floor(skinRng.next() * skinPool.length)]
-
-        const instanceSeed = hashSeed(set.id, slot, 'instance')
-        const built = buildInstance(template, level, instanceSeed, chosenSkin)
-
-        const instanceId = crypto.randomUUID()
-        await tx`
-          insert into instances (id, item_id, seed, skin, prompt, answer_spec, created_at)
-          values (${instanceId}, ${selection.itemId}, ${instanceSeed}, ${chosenSkin},
-                  ${JSON.stringify(built.prompt)}::jsonb, ${JSON.stringify(built.answerSpec)}::jsonb, now())
+          select family_id, kind from items where id = ${selection.itemId}
         `
 
-        await tx`
-          insert into instance_secrets (instance_id, answer, misconceptions, steps, solution)
-          values (${instanceId}, ${JSON.stringify(built.secret.answer)}::jsonb,
-                  ${JSON.stringify(built.secret.misconceptions)}::jsonb,
-                  ${JSON.stringify(built.secret.steps)}::jsonb,
-                  ${JSON.stringify(built.secret.solution)}::jsonb)
-        `
+        let instanceId = crypto.randomUUID()
+        let instancePrompt: Block[]
+        let instanceAnswerSpec: AnswerSpec
+
+        if (item.kind === 'code') {
+          const problemId = selection.itemId.split('@')[0]
+          const problem = CODE_PROBLEMS.find((p) => p.id === problemId)
+          if (!problem) {
+            throw new Error(`Code problem not found: ${selection.itemId}`)
+          }
+          instancePrompt = [
+            ...problem.statement,
+            { t: 'p', text: '**Input Format**' },
+            ...problem.inputFormat,
+            { t: 'p', text: '**Output Format**' },
+            ...problem.outputFormat,
+            { t: 'p', text: '**Constraints**' },
+            ...problem.constraints,
+          ]
+          instanceAnswerSpec = { type: 'code', languages: ['python', 'cpp', 'javascript'] }
+          const instanceSeed = hashSeed(set.id, slot, 'instance')
+
+          await tx`
+            insert into instances (id, item_id, seed, skin, prompt, answer_spec, created_at)
+            values (${instanceId}, ${selection.itemId}, ${instanceSeed}, 'default',
+                    ${JSON.stringify(instancePrompt)}::jsonb, ${JSON.stringify(instanceAnswerSpec)}::jsonb, now())
+          `
+
+          await tx`
+            insert into instance_secrets (instance_id, answer, misconceptions, steps, solution)
+            values (${instanceId}, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb)
+          `
+        } else {
+          const { template, level } = templateFor(selection.itemId)
+
+          // Select skin not used in last 5 attempts on that template
+          const recentAttempts = await tx`
+            select i.skin
+            from attempts a
+            join instances i on a.instance_id = i.id
+            where a.user_id = ${ctx.userId}
+              and a.item_id like ${template.id + '@' + template.version + '%'}
+            order by a.presented_at desc
+            limit 5
+          `
+          const usedSkins = new Set(recentAttempts.map((r) => r.skin))
+          const availableSkins = template.skins.filter((s: string) => !usedSkins.has(s))
+          const skinPool = availableSkins.length > 0 ? availableSkins : template.skins
+          const skinRng = makeRng(hashSeed(set.id, slot, 'skin'))
+          const chosenSkin = skinPool[Math.floor(skinRng.next() * skinPool.length)]
+
+          const instanceSeed = hashSeed(set.id, slot, 'instance')
+          const built = buildInstance(template, level, instanceSeed, chosenSkin)
+          instancePrompt = built.prompt
+          instanceAnswerSpec = built.answerSpec
+
+          await tx`
+            insert into instances (id, item_id, seed, skin, prompt, answer_spec, created_at)
+            values (${instanceId}, ${selection.itemId}, ${instanceSeed}, ${chosenSkin},
+                    ${JSON.stringify(built.prompt)}::jsonb, ${JSON.stringify(built.answerSpec)}::jsonb, now())
+          `
+
+          await tx`
+            insert into instance_secrets (instance_id, answer, misconceptions, steps, solution)
+            values (${instanceId}, ${JSON.stringify(built.secret.answer)}::jsonb,
+                    ${JSON.stringify(built.secret.misconceptions)}::jsonb,
+                    ${JSON.stringify(built.secret.steps)}::jsonb,
+                    ${JSON.stringify(built.secret.solution)}::jsonb)
+          `
+        }
 
         let kind: 'placement' | 'selected' | 'echo' | 'unrated'
         if (set.mode === 'unrated') {
@@ -478,7 +528,7 @@ export async function handleNextProblem(ctx: Ctx): Promise<Response> {
           select name from concepts where id = ${selection.conceptId}
         `
 
-        return toAttemptView(newAttempt, built, {
+        return toAttemptView(newAttempt, { prompt: instancePrompt, answer_spec: instanceAnswerSpec }, {
           id: selection.conceptId,
           name: cRow ? cRow.name : selection.conceptId,
         })
@@ -539,13 +589,41 @@ export async function handleGetAttempt(ctx: Ctx): Promise<Response> {
     }
   }
 
+  let codeInfo: {
+    verdict?: string | null
+    failedGroupLabel?: string | null
+    editorial?: Block[]
+    referenceSolutions?: Record<string, string>
+  } | undefined
+
+  if (attempt.track_id === 'code') {
+    const [sub] = await sql`
+      select verdict, failed_group from code_submissions
+      where attempt_id = ${attempt.id}
+      order by created_at desc
+      limit 1
+    `
+    const problem = CODE_PROBLEMS.find((p) => p.id === attempt.item_id.split('@')[0])
+    const failedGroupLabel =
+      sub && sub.failed_group !== null && sub.failed_group !== undefined && problem
+        ? problem.groups[sub.failed_group]?.label ?? null
+        : null
+    codeInfo = {
+      verdict: sub?.verdict ?? null,
+      failedGroupLabel,
+      editorial: problem?.editorial,
+      referenceSolutions: problem?.referenceSolutions,
+    }
+  }
+
   const view = toAttemptView(
     attempt,
     attempt,
     { id: attempt.concept_id, name: attempt.concept_name },
     secrets,
     earlierNote,
-    playbookNote
+    playbookNote,
+    codeInfo
   )
 
   return ok(view)

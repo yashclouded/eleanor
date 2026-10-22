@@ -10,7 +10,7 @@ describe('API: Sets and next problem', () => {
   async function onboardUser(prefix: string) {
     const user = await createTestUser(prefix)
     const cleanPrefix = prefix.slice(0, 8).toLowerCase().replace(/[^a-z0-9]/g, '')
-    const id = `${seq++}_${(Date.now() % 10000).toString(36)}`
+    const id = `${seq++}_${crypto.randomUUID().slice(0, 6)}`
     const handle = `u_${cleanPrefix}_${id}`.slice(0, 20)
     const res = await call(
       '/onboarding',

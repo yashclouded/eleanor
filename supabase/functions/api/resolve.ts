@@ -36,7 +36,7 @@ export async function resolveAttempt(
   if (!attempt) {
     throw new HttpError('not_found', 'Attempt not found')
   }
-  if (attempt.state !== 'presented') {
+  if (attempt.state !== 'presented' && attempt.state !== 'judging') {
     throw new HttpError('conflict', 'Attempt is already resolved')
   }
 

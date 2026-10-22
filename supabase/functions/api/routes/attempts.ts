@@ -4,6 +4,7 @@ import { withTransition } from '../transition.ts'
 import { parseAnswer, isCorrect, matchMisconception, parseNumber } from '../../_shared/grading.ts'
 import type { AnswerSpec, RawAnswer, Block, Tolerance } from '../../_shared/content/types.ts'
 import { toAttemptView, parseJsonIfNeeded } from './sets.ts'
+import { CODE_PROBLEMS } from '../../_shared/registry.ts'
 import { resolveAttempt } from '../resolve.ts'
 import type { Ctx } from '../router.ts'
 
@@ -89,6 +90,10 @@ export async function handleCommitAttempt(ctx: Ctx): Promise<Response> {
       typeof attempt.answer_spec === 'string'
         ? JSON.parse(attempt.answer_spec)
         : attempt.answer_spec
+
+    if (spec.type === 'code') {
+      throw new HttpError('invalid', 'Code attempts must be submitted via /code/submit')
+    }
 
     const parsed = parseAnswer(spec, b.answer)
     if (!parsed.ok) {
@@ -441,13 +446,41 @@ export async function handleRevealAttempt(ctx: Ctx): Promise<Response> {
           steps: parseJsonIfNeeded(attempt.steps),
         }
 
+        let codeInfo: {
+          verdict?: string | null
+          failedGroupLabel?: string | null
+          editorial?: Block[]
+          referenceSolutions?: Record<string, string>
+        } | undefined
+
+        if (attempt.track_id === 'code') {
+          const [sub] = await tx`
+            select verdict, failed_group from code_submissions
+            where attempt_id = ${attempt.id}
+            order by created_at desc
+            limit 1
+          `
+          const problem = CODE_PROBLEMS.find((p) => p.id === attempt.item_id.split('@')[0])
+          const failedGroupLabel =
+            sub && sub.failed_group !== null && sub.failed_group !== undefined && problem
+              ? problem.groups[sub.failed_group]?.label ?? null
+              : null
+          codeInfo = {
+            verdict: sub?.verdict ?? null,
+            failedGroupLabel,
+            editorial: problem?.editorial,
+            referenceSolutions: problem?.referenceSolutions,
+          }
+        }
+
         return toAttemptView(
           attempt,
           attempt,
           { id: attempt.concept_id, name: attempt.concept_name },
           secrets,
           earlierNote,
-          playbookNote
+          playbookNote,
+          codeInfo
         )
       }
     )

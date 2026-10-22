@@ -26,6 +26,11 @@ import {
 import {
   handleCreateReport,
 } from './routes/reports.ts'
+import {
+  handleCodeRun,
+  handleCodeSubmit,
+  handleGetCodeSubmission,
+} from './routes/code.ts'
 
 export type Ctx = {
   userId: string
@@ -79,6 +84,9 @@ const routes: RouteEntry[] = [
   createRoute('GET', '/export', handleExport),
   createRoute('POST', '/account/delete', handleDeleteAccount),
   createRoute('POST', '/reports', handleCreateReport),
+  createRoute('POST', '/code/run', handleCodeRun),
+  createRoute('POST', '/code/submit', handleCodeSubmit),
+  createRoute('GET', '/code/submissions/:id', handleGetCodeSubmission),
 ]
 
 export async function route(req: Request, ctx: Omit<Ctx, 'params'>): Promise<Response> {

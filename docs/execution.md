@@ -1464,8 +1464,8 @@ Commit: "feat(api): Judge0-backed code judging".
 
 **Done when:**
 
-- [ ] The fake-judge suite passes.
-- [ ] The real-host smoke test shows `accepted` for all 3 languages.
+- [x] The fake-judge suite passes.
+- [x] The real-host smoke test shows `accepted` for all 3 languages.
 
 ### Task 5.3: Code UI
 
