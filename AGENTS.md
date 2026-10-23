@@ -12,7 +12,7 @@
   - [docs/research.md](docs/research.md): evidence and claim limits.
   - `docs/archive/`: superseded material. Never implement from it.
 - Stack (planned): Node 22, npm, React + TypeScript + Vite, Supabase (Auth, Postgres + RLS, Edge Functions, `pg_cron`), Judge0 for code, Vitest, Playwright.
-- Judge0 (CE): `https://ce.judge0.com`. Languages: Python 3 (Python 3.12.5, id 100), C++17 (C++ GCC 14.1.0, id 105), JavaScript (Node.js 22.08.0, id 102).
+- Judge0 (CE): `https://ce.judge0.com`. Languages: Python 3 (Python 3.8.1, id 71), C++17 (C++ GCC 14.1.0, id 105), JavaScript (Node.js 12.14.0, id 63).
 
 ## Getting context with minimum tokens
 

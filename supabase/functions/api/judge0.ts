@@ -97,9 +97,9 @@ export function getLanguageId(lang: 'python' | 'cpp' | 'javascript'): number {
   }
 
   const defaults: Record<'python' | 'cpp' | 'javascript', number> = {
-    python: 100, // Python (3.12.5)
-    cpp: 105,    // C++ (GCC 14.1.0)
-    javascript: 102, // JavaScript (Node.js 22.08.0)
+    python: 71, // Python (3.8.1)
+    cpp: 105, // C++ (GCC 14.1.0)
+    javascript: 63, // JavaScript (Node.js 12.14.0)
   }
   return defaults[lang]
 }
