@@ -34,7 +34,17 @@ export type AttemptView = {
     repair?: { index: number; prompt: Block[]; tolerance: Tolerance } | null
     verdict?: string | null
     failedGroupLabel?: string | null
+    failedGroupFingerprint?: string | null
+    compileOutput?: string | null
+    isRated?: boolean
   }
+  lastCodeSubmission?: {
+    verdict: string | null
+    failedGroupLabel?: string | null
+    failedGroupFingerprint?: string | null
+    compileOutput?: string | null
+    isRated?: boolean
+  } | null
   repair?: { index: number; prompt: Block[]; tolerance: Tolerance } | null
   reveal?: {
     solution: Block[]
@@ -57,6 +67,54 @@ export function parseJsonIfNeeded<T>(val: T | string): T {
   return val as T
 }
 
+export type CodeInfo = {
+  verdict?: string | null
+  failedGroupLabel?: string | null
+  failedGroupFingerprint?: string | null
+  compileOutput?: string | null
+  editorial?: Block[]
+  referenceSolutions?: Record<string, string>
+  statement?: Block[]
+  inputFormat?: Block[]
+  outputFormat?: Block[]
+  constraints?: Block[]
+  samples?: { input: string; output: string; explain?: Block[] }[]
+  isRated?: boolean
+}
+
+export async function getCodeInfoForAttempt(
+  db: postgres.Sql | postgres.TransactionSql,
+  attempt: any
+): Promise<CodeInfo | undefined> {
+  if (attempt.track_id !== 'code') return undefined
+  const [sub] = await db`
+    select verdict, failed_group, compile_output, rated from code_submissions
+    where attempt_id = ${attempt.id}
+    order by created_at desc
+    limit 1
+  `
+  const problem = CODE_PROBLEMS.find((p) => p.id === attempt.item_id.split('@')[0])
+  const group =
+    sub && sub.failed_group !== null && sub.failed_group !== undefined && problem
+      ? problem.groups[sub.failed_group]
+      : null
+
+  return {
+    verdict: sub?.verdict ?? null,
+    failedGroupLabel: group?.label ?? null,
+    failedGroupFingerprint: group?.fingerprint ?? null,
+    compileOutput: sub?.compile_output ?? null,
+    editorial: problem?.editorial,
+    referenceSolutions: problem?.referenceSolutions,
+    statement: problem?.statement,
+    inputFormat: problem?.inputFormat,
+    outputFormat: problem?.outputFormat,
+    constraints: problem?.constraints,
+    samples: problem?.samples,
+    isRated: sub ? Boolean(sub.rated) : attempt.rated,
+  }
+}
+
 export function toAttemptView(
   attempt: any,
   instance: any,
@@ -64,12 +122,7 @@ export function toAttemptView(
   secrets?: any,
   earlierNote: string | null = null,
   playbookNote: string | null = null,
-  codeInfo?: {
-    verdict?: string | null
-    failedGroupLabel?: string | null
-    editorial?: Block[]
-    referenceSolutions?: Record<string, string>
-  }
+  codeInfo?: CodeInfo
 ): AttemptView {
   const view: AttemptView = {
     id: attempt.id,
@@ -85,6 +138,25 @@ export function toAttemptView(
     },
     prompt: parseJsonIfNeeded(instance.prompt),
     answerSpec: parseJsonIfNeeded(instance.answer_spec ?? instance.answerSpec),
+  }
+
+  if (attempt.track_id === 'code') {
+    const spec = view.answerSpec as any
+    if (codeInfo?.statement && !spec.statement) spec.statement = codeInfo.statement
+    if (codeInfo?.inputFormat && !spec.inputFormat) spec.inputFormat = codeInfo.inputFormat
+    if (codeInfo?.outputFormat && !spec.outputFormat) spec.outputFormat = codeInfo.outputFormat
+    if (codeInfo?.constraints && !spec.constraints) spec.constraints = codeInfo.constraints
+    if (codeInfo?.samples && !spec.samples) spec.samples = codeInfo.samples
+
+    if (codeInfo?.verdict) {
+      view.lastCodeSubmission = {
+        verdict: codeInfo.verdict,
+        failedGroupLabel: codeInfo.failedGroupLabel ?? null,
+        failedGroupFingerprint: codeInfo.failedGroupFingerprint ?? null,
+        compileOutput: codeInfo.compileOutput ?? null,
+        isRated: codeInfo.isRated,
+      }
+    }
   }
 
   if (attempt.state === 'resolved' || attempt.state === 'revealed') {
@@ -112,6 +184,9 @@ export function toAttemptView(
       repairTotal: Array.isArray(stepsList) ? stepsList.length : 0,
       verdict: codeInfo?.verdict ?? null,
       failedGroupLabel: codeInfo?.failedGroupLabel ?? null,
+      failedGroupFingerprint: codeInfo?.failedGroupFingerprint ?? null,
+      compileOutput: codeInfo?.compileOutput ?? null,
+      isRated: codeInfo?.isRated !== undefined ? codeInfo.isRated : attempt.rated,
     }
 
     const stepIndex = attempt.repair_step ?? 0
@@ -323,11 +398,16 @@ export async function handleNextProblem(ctx: Ctx): Promise<Response> {
     // Resume logic: if resume is requested, return current slot state (presented, resolved, revealed)
     if (b.resume && existingAttempts.length > 0) {
       const current = existingAttempts[existingAttempts.length - 1]
+      const codeInfo = await getCodeInfoForAttempt(tx, current)
       if (current.state === 'presented' || current.state === 'judging') {
         const view = toAttemptView(
           current,
           current,
-          { id: current.concept_id, name: current.concept_name }
+          { id: current.concept_id, name: current.concept_name },
+          undefined,
+          null,
+          null,
+          codeInfo
         )
         return ok(view)
       }
@@ -369,7 +449,8 @@ export async function handleNextProblem(ctx: Ctx): Promise<Response> {
         { id: current.concept_id, name: current.concept_name },
         secrets,
         earlierNote,
-        playbookNote
+        playbookNote,
+        codeInfo
       )
       return ok(view)
     }
@@ -378,10 +459,15 @@ export async function handleNextProblem(ctx: Ctx): Promise<Response> {
     if (existingAttempts.length > 0) {
       const current = existingAttempts[existingAttempts.length - 1]
       if (current.state === 'presented' || current.state === 'judging') {
+        const codeInfo = await getCodeInfoForAttempt(tx, current)
         const view = toAttemptView(
           current,
           current,
-          { id: current.concept_id, name: current.concept_name }
+          { id: current.concept_id, name: current.concept_name },
+          undefined,
+          null,
+          null,
+          codeInfo
         )
         return ok(view)
       }
@@ -446,7 +532,15 @@ export async function handleNextProblem(ctx: Ctx): Promise<Response> {
             { t: 'p', text: '**Constraints**' },
             ...problem.constraints,
           ]
-          instanceAnswerSpec = { type: 'code', languages: ['python', 'cpp', 'javascript'] }
+          instanceAnswerSpec = {
+            type: 'code',
+            languages: ['python', 'cpp', 'javascript'],
+            statement: problem.statement,
+            inputFormat: problem.inputFormat,
+            outputFormat: problem.outputFormat,
+            constraints: problem.constraints,
+            samples: problem.samples,
+          }
           const instanceSeed = hashSeed(set.id, slot, 'instance')
 
           await tx`
@@ -528,10 +622,19 @@ export async function handleNextProblem(ctx: Ctx): Promise<Response> {
           select name from concepts where id = ${selection.conceptId}
         `
 
-        return toAttemptView(newAttempt, { prompt: instancePrompt, answer_spec: instanceAnswerSpec }, {
-          id: selection.conceptId,
-          name: cRow ? cRow.name : selection.conceptId,
-        })
+        const codeInfo = await getCodeInfoForAttempt(tx, newAttempt)
+        return toAttemptView(
+          newAttempt,
+          { prompt: instancePrompt, answer_spec: instanceAnswerSpec },
+          {
+            id: selection.conceptId,
+            name: cRow ? cRow.name : selection.conceptId,
+          },
+          undefined,
+          null,
+          null,
+          codeInfo
+        )
       }
     )
 
@@ -589,32 +692,7 @@ export async function handleGetAttempt(ctx: Ctx): Promise<Response> {
     }
   }
 
-  let codeInfo: {
-    verdict?: string | null
-    failedGroupLabel?: string | null
-    editorial?: Block[]
-    referenceSolutions?: Record<string, string>
-  } | undefined
-
-  if (attempt.track_id === 'code') {
-    const [sub] = await sql`
-      select verdict, failed_group from code_submissions
-      where attempt_id = ${attempt.id}
-      order by created_at desc
-      limit 1
-    `
-    const problem = CODE_PROBLEMS.find((p) => p.id === attempt.item_id.split('@')[0])
-    const failedGroupLabel =
-      sub && sub.failed_group !== null && sub.failed_group !== undefined && problem
-        ? problem.groups[sub.failed_group]?.label ?? null
-        : null
-    codeInfo = {
-      verdict: sub?.verdict ?? null,
-      failedGroupLabel,
-      editorial: problem?.editorial,
-      referenceSolutions: problem?.referenceSolutions,
-    }
-  }
+  const codeInfo = await getCodeInfoForAttempt(sql, attempt)
 
   const view = toAttemptView(
     attempt,

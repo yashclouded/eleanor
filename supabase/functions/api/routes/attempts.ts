@@ -449,27 +449,43 @@ export async function handleRevealAttempt(ctx: Ctx): Promise<Response> {
         let codeInfo: {
           verdict?: string | null
           failedGroupLabel?: string | null
+          failedGroupFingerprint?: string | null
+          compileOutput?: string | null
           editorial?: Block[]
           referenceSolutions?: Record<string, string>
+          statement?: Block[]
+          inputFormat?: Block[]
+          outputFormat?: Block[]
+          constraints?: Block[]
+          samples?: { input: string; output: string; explain?: Block[] }[]
+          isRated?: boolean
         } | undefined
 
         if (attempt.track_id === 'code') {
           const [sub] = await tx`
-            select verdict, failed_group from code_submissions
+            select verdict, failed_group, compile_output, rated from code_submissions
             where attempt_id = ${attempt.id}
             order by created_at desc
             limit 1
           `
           const problem = CODE_PROBLEMS.find((p) => p.id === attempt.item_id.split('@')[0])
-          const failedGroupLabel =
+          const group =
             sub && sub.failed_group !== null && sub.failed_group !== undefined && problem
-              ? problem.groups[sub.failed_group]?.label ?? null
+              ? problem.groups[sub.failed_group]
               : null
           codeInfo = {
             verdict: sub?.verdict ?? null,
-            failedGroupLabel,
+            failedGroupLabel: group?.label ?? null,
+            failedGroupFingerprint: group?.fingerprint ?? null,
+            compileOutput: sub?.compile_output ?? null,
             editorial: problem?.editorial,
             referenceSolutions: problem?.referenceSolutions,
+            statement: problem?.statement,
+            inputFormat: problem?.inputFormat,
+            outputFormat: problem?.outputFormat,
+            constraints: problem?.constraints,
+            samples: problem?.samples,
+            isRated: sub ? Boolean(sub.rated) : attempt.rated,
           }
         }
 

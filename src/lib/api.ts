@@ -25,7 +25,17 @@ export type AttemptView = {
     repair?: { index: number; prompt: Block[]; tolerance: Tolerance } | null
     verdict?: string | null
     failedGroupLabel?: string | null
+    failedGroupFingerprint?: string | null
+    compileOutput?: string | null
+    isRated?: boolean
   }
+  lastCodeSubmission?: {
+    verdict: string | null
+    failedGroupLabel?: string | null
+    failedGroupFingerprint?: string | null
+    compileOutput?: string | null
+    isRated?: boolean
+  } | null
   repair?: { index: number; prompt: Block[]; tolerance: Tolerance } | null
   reveal?: {
     solution: Block[]

@@ -13,6 +13,8 @@ import { RepairLadder, type RepairStepData } from '../components/RepairLadder.ts
 import { Reveal } from '../components/Reveal.tsx'
 import { InsightInput } from '../components/InsightInput.tsx'
 import { SetSummary, type SetSummaryData } from '../components/SetSummary.tsx'
+import { CodeEditor, type RunResult } from '../components/CodeEditor.tsx'
+import { CodeVerdict } from '../components/CodeVerdict.tsx'
 
 export function SetPlayer() {
   const { setId } = useParams<{ setId: string }>()
@@ -27,10 +29,34 @@ export function SetPlayer() {
   const [isDone, setIsDone] = useState(false)
   const [summary, setSummary] = useState<SetSummaryData | null>(null)
 
-  // Draft inputs for presented state
+  // Draft inputs for presented state (standard problem)
   const [draftAnswer, setDraftAnswer] = useState<RawAnswer>('')
   const [draftConfidence, setDraftConfidence] = useState<number | null>(null)
   const [declaredHelp, setDeclaredHelp] = useState(false)
+
+  // Code track state
+  const [codeSource, setCodeSource] = useState<string>('')
+  const [codeLanguage, setCodeLanguage] = useState<'python' | 'cpp' | 'javascript'>(() => {
+    try {
+      const saved = localStorage.getItem('eleanor_code_lang')
+      if (saved === 'python' || saved === 'cpp' || saved === 'javascript') {
+        return saved
+      }
+    } catch {
+      // Ignore
+    }
+    return 'python'
+  })
+  const [isJudging, setIsJudging] = useState(false)
+  const [codeCompileError, setCodeCompileError] = useState<string | null>(null)
+  const [codeSubmitError, setCodeSubmitError] = useState<string | null>(null)
+  const [codeVerdictInfo, setCodeVerdictInfo] = useState<{
+    verdict: string
+    failedGroupLabel?: string | null
+    failedGroupFingerprint?: string | null
+    compileOutput?: string | null
+    isRated?: boolean
+  } | null>(null)
 
   // Repair & Reveal state
   const [repairActive, setRepairActive] = useState(false)
@@ -75,8 +101,25 @@ export function SetPlayer() {
             setDeclaredHelp(false)
             setRepairActive(false)
             setCurrentRepairStep(null)
+            setCodeCompileError(null)
+            setCodeSubmitError(null)
+            setCodeVerdictInfo(null)
           } else if (att.repair) {
             setCurrentRepairStep(att.repair)
+          }
+
+          // Restore saved code draft if code track problem
+          if (att.track === 'code' || att.answerSpec.type === 'code') {
+            try {
+              const saved = localStorage.getItem(`eleanor_code_draft_${att.id}`)
+              if (saved !== null) {
+                setCodeSource(saved)
+              } else if (att.result?.answer && typeof att.result.answer === 'string') {
+                setCodeSource(att.result.answer)
+              }
+            } catch {
+              // Ignore
+            }
           }
         }
       } catch (err: unknown) {
@@ -93,7 +136,42 @@ export function SetPlayer() {
     loadSet(false)
   }, [loadSet])
 
-  // Commit action
+  // Sync draft code and verdicts whenever attempt changes
+  useEffect(() => {
+    if (!attempt) return
+    if (attempt.answerSpec.type === 'code') {
+      try {
+        const savedDraft = localStorage.getItem(`eleanor_code_draft_${attempt.id}`)
+        if (savedDraft !== null) {
+          setCodeSource(savedDraft)
+        } else if (attempt.result?.answer && typeof attempt.result.answer === 'string') {
+          setCodeSource(attempt.result.answer)
+        }
+      } catch {
+        // Ignore
+      }
+
+      if (attempt.result?.verdict) {
+        setCodeVerdictInfo({
+          verdict: attempt.result.verdict,
+          failedGroupLabel: attempt.result.failedGroupLabel,
+          failedGroupFingerprint: attempt.result.failedGroupFingerprint,
+          compileOutput: attempt.result.compileOutput,
+          isRated: attempt.result.isRated !== undefined ? attempt.result.isRated : attempt.rated,
+        })
+      } else if (attempt.lastCodeSubmission?.verdict) {
+        setCodeVerdictInfo({
+          verdict: attempt.lastCodeSubmission.verdict,
+          failedGroupLabel: attempt.lastCodeSubmission.failedGroupLabel,
+          failedGroupFingerprint: attempt.lastCodeSubmission.failedGroupFingerprint,
+          compileOutput: attempt.lastCodeSubmission.compileOutput,
+          isRated: attempt.lastCodeSubmission.isRated !== undefined ? attempt.lastCodeSubmission.isRated : false,
+        })
+      }
+    }
+  }, [attempt])
+
+  // Standard Commit action
   const commitAction = useAction<
     {
       answer: RawAnswer
@@ -135,7 +213,7 @@ export function SetPlayer() {
     })
   })
 
-  // Handle Commit button click
+  // Handle standard Commit button click
   const handleCommit = async () => {
     if (!attempt || draftConfidence === null) return
     const parsed = parseAnswer(attempt.answerSpec, draftAnswer)
@@ -159,7 +237,120 @@ export function SetPlayer() {
         }
       })
     } catch {
-      // Error is stored in commitAction.error and retry stays enabled
+      // Handled by commitAction.error
+    }
+  }
+
+  // Handle Code Run
+  const handleRunCode = async (stdin: string): Promise<RunResult> => {
+    if (!attempt) throw new Error('No active attempt')
+    const res = await api<RunResult>('/code/run', {
+      method: 'POST',
+      body: {
+        attemptId: attempt.id,
+        language: codeLanguage,
+        source: codeSource,
+        input: stdin,
+      },
+    })
+    return res
+  }
+
+  // Handle Code Submit
+  const handleSubmitCode = async () => {
+    if (!attempt || !codeSource.trim() || isJudging) return
+    if (attempt.state === 'presented' && draftConfidence === null) return
+    setIsJudging(true)
+    setCodeSubmitError(null)
+    setCodeCompileError(null)
+
+    const effectiveConfidence =
+      (draftConfidence ??
+        (attempt.result?.confidence
+          ? Math.round(attempt.result.confidence * 100)
+          : 80)) / 100
+
+    try {
+      const transitionId = crypto.randomUUID()
+      const submitRes = await api<{ submissionId: string }>('/code/submit', {
+        method: 'POST',
+        body: {
+          transitionId,
+          attemptId: attempt.id,
+          language: codeLanguage,
+          source: codeSource,
+          confidence: effectiveConfidence,
+          declaredHelp,
+        },
+      })
+
+      // Polling loop for submission resolution
+      const startTime = Date.now()
+      let finished = false
+      while (!finished && Date.now() - startTime < 90_000) {
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        const sub = await api<{
+          status: 'queued' | 'done' | 'error'
+          verdict?: string
+          failedGroup?: number | null
+          compileOutput?: string | null
+          rated?: boolean
+        }>(`/code/submissions/${submitRes.submissionId}`)
+
+        if (sub.status === 'done') {
+          finished = true
+          setIsJudging(false)
+
+          if (sub.verdict === 'compile_error') {
+            setCodeCompileError(sub.compileOutput || 'Compilation error')
+            setCodeVerdictInfo({
+              verdict: 'compile_error',
+              compileOutput: sub.compileOutput || null,
+              isRated: false,
+            })
+            // Fetch fresh attempt (remains in presented state)
+            const fresh = await api<AttemptView>(`/attempts/${attempt.id}`)
+            setAttempt(fresh)
+            return
+          } else {
+            // Evaluated verdict (accepted, wrong_answer, time_limit, runtime_error)
+            const fresh = await api<AttemptView>(`/attempts/${attempt.id}`)
+            setAttempt(fresh)
+            setCodeVerdictInfo({
+              verdict: sub.verdict || fresh.result?.verdict || 'accepted',
+              failedGroupLabel: fresh.result?.failedGroupLabel,
+              failedGroupFingerprint: fresh.result?.failedGroupFingerprint,
+              compileOutput: sub.compileOutput || null,
+              isRated:
+                sub.rated !== undefined
+                  ? sub.rated
+                  : fresh.result?.isRated !== undefined
+                    ? fresh.result.isRated
+                    : fresh.rated,
+            })
+            return
+          }
+        } else if (sub.status === 'error') {
+          finished = true
+          setIsJudging(false)
+          setCodeVerdictInfo({
+            verdict: 'judge_error',
+            isRated: false,
+          })
+          const fresh = await api<AttemptView>(`/attempts/${attempt.id}`)
+          setAttempt(fresh)
+          return
+        }
+      }
+
+      if (!finished) {
+        setIsJudging(false)
+        setCodeSubmitError('Judging timed out. Please retry submission.')
+      }
+    } catch (err: unknown) {
+      setIsJudging(false)
+      const msg = err instanceof Error ? err.message : 'Submission failed'
+      setCodeSubmitError(msg)
     }
   }
 
@@ -248,6 +439,7 @@ export function SetPlayer() {
     return null
   }
 
+  const isCodeProblem = attempt.track === 'code' || attempt.answerSpec.type === 'code'
   const isPresented = attempt.state === 'presented'
   const isResolved = attempt.state === 'resolved'
   const isRevealed = attempt.state === 'revealed'
@@ -294,81 +486,434 @@ export function SetPlayer() {
         )}
       </div>
 
-      {/* Problem Prompt */}
-      <div
-        className="form-card"
-        style={{
-          marginBottom: 'var(--space-6)',
-          padding: 'var(--space-5)',
-        }}
-      >
-        <PromptBlocks blocks={attempt.prompt} />
-      </div>
-
-      {/* 1. PRESENTED STATE: Answer input, Confidence input, Commit, Give up */}
-      {isPresented && (
-        <div data-testid="presented-state" className="form-card" style={{ padding: 'var(--space-5)' }}>
-          <AnswerInput
-            spec={attempt.answerSpec}
-            value={draftAnswer}
-            onChange={setDraftAnswer}
-            disabled={commitAction.pending || giveUpAction.pending}
-            id="answer-input"
+      {/* CODE PROBLEM VIEW */}
+      {isCodeProblem ? (
+        <>
+          {/* Code Editor component handles problem statement, input/output formats, constraints, samples, and code editing */}
+          <CodeEditor
+            attemptId={attempt.id}
+            statementBlocks={
+              attempt.answerSpec.type === 'code' && attempt.answerSpec.statement
+                ? attempt.answerSpec.statement
+                : attempt.prompt
+            }
+            inputFormatBlocks={
+              attempt.answerSpec.type === 'code' ? attempt.answerSpec.inputFormat : undefined
+            }
+            outputFormatBlocks={
+              attempt.answerSpec.type === 'code' ? attempt.answerSpec.outputFormat : undefined
+            }
+            constraintsBlocks={
+              attempt.answerSpec.type === 'code' ? attempt.answerSpec.constraints : undefined
+            }
+            samples={
+              attempt.answerSpec.type === 'code' ? attempt.answerSpec.samples : undefined
+            }
+            source={codeSource}
+            onChange={setCodeSource}
+            language={codeLanguage}
+            onLanguageChange={setCodeLanguage}
+            onRun={handleRunCode}
+            disabled={isJudging}
           />
 
-          <ConfidenceInput
-            value={draftConfidence}
-            onChange={setDraftConfidence}
-            isCode={attempt.track === 'code'}
-            disabled={commitAction.pending || giveUpAction.pending}
-            declaredHelp={declaredHelp}
-            onDeclaredHelpChange={setDeclaredHelp}
-          />
-
-          {commitAction.error && (
-            <div data-testid="commit-error" className="alert alert-error" role="alert" style={{ marginTop: 'var(--space-4)' }}>
-              <div style={{ marginBottom: 'var(--space-2)' }}>
-                {commitAction.error.message || 'Submission failed. Please retry.'}
-              </div>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={handleCommit}
-              >
-                Retry
-              </button>
+          {/* Compilation error verdict shown in presented state */}
+          {isPresented && (codeCompileError || (codeVerdictInfo && codeVerdictInfo.verdict === 'compile_error')) && (
+            <div style={{ marginBottom: 'var(--space-5)' }}>
+              <CodeVerdict
+                verdict="compile_error"
+                compileOutput={codeCompileError || codeVerdictInfo?.compileOutput}
+                isRated={false}
+              />
             </div>
           )}
 
+          {/* 1. PRESENTED STATE: Confidence input, Judging indicator, Submit, Stuck */}
+          {isPresented && (
+            <div data-testid="presented-state" className="form-card" style={{ padding: 'var(--space-5)' }}>
+              <ConfidenceInput
+                value={draftConfidence}
+                onChange={setDraftConfidence}
+                isCode={true}
+                disabled={isJudging}
+                declaredHelp={declaredHelp}
+                onDeclaredHelpChange={setDeclaredHelp}
+              />
+
+              {/* Polite live region for Judging state */}
+              {isJudging && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  data-testid="judging-indicator"
+                  className="judging-indicator"
+                  style={{
+                    marginTop: 'var(--space-4)',
+                    padding: 'var(--space-3) var(--space-4)',
+                    background: 'var(--surface-hover)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontWeight: 600,
+                    color: 'var(--accent)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-2)',
+                  }}
+                >
+                  <span className="spinner" aria-hidden="true" /> Judging…
+                </div>
+              )}
+
+              {codeSubmitError && (
+                <div data-testid="code-submit-error" className="alert alert-error" role="alert" style={{ marginTop: 'var(--space-4)' }}>
+                  {codeSubmitError}
+                </div>
+              )}
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginTop: 'var(--space-6)',
+                  paddingTop: 'var(--space-4)',
+                  borderTop: '1px solid var(--border)',
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  data-testid="code-submit-button"
+                  onClick={handleSubmitCode}
+                  disabled={isJudging || draftConfidence === null || !codeSource.trim()}
+                >
+                  {isJudging ? 'Judging…' : 'Submit'}
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setShowGiveUpConfirm(true)}
+                  disabled={isJudging}
+                >
+                  I'm stuck
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 2. RESOLVED STATE: Verdict, repair resubmits, reveal button */}
+          {isResolved && (
+            <div style={{ marginTop: 'var(--space-6)' }}>
+              {/* Verdict Panel */}
+              <CodeVerdict
+                verdict={codeVerdictInfo?.verdict || attempt.result?.verdict || 'wrong_answer'}
+                failedGroupLabel={codeVerdictInfo?.failedGroupLabel || attempt.result?.failedGroupLabel}
+                failedGroupFingerprint={codeVerdictInfo?.failedGroupFingerprint || attempt.result?.failedGroupFingerprint}
+                isRated={
+                  codeVerdictInfo?.isRated !== undefined
+                    ? codeVerdictInfo.isRated
+                    : attempt.result?.isRated !== undefined
+                      ? attempt.result.isRated
+                      : attempt.rated
+                }
+                compileOutput={codeVerdictInfo?.compileOutput || attempt.result?.compileOutput}
+                isRevealed={false}
+              />
+
+              {/* Live region if resubmitting during repair */}
+              {isJudging && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  data-testid="judging-indicator"
+                  className="judging-indicator"
+                  style={{
+                    marginTop: 'var(--space-4)',
+                    padding: 'var(--space-3) var(--space-4)',
+                    background: 'var(--surface-hover)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontWeight: 600,
+                    color: 'var(--accent)',
+                  }}
+                >
+                  Judging…
+                </div>
+              )}
+
+              {/* Actions in resolved state */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 'var(--space-3)',
+                  marginTop: 'var(--space-5)',
+                  alignItems: 'center',
+                }}
+              >
+                {attempt.result?.outcome !== 'correct' && (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    data-testid="code-submit-button"
+                    onClick={handleSubmitCode}
+                    disabled={isJudging || !codeSource.trim()}
+                  >
+                    {isJudging ? 'Judging…' : 'Submit repair'}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  data-testid="reveal-button"
+                  onClick={handleReveal}
+                  disabled={revealAction.pending || isJudging}
+                >
+                  {revealAction.pending ? 'Revealing...' : 'Reveal solution'}
+                </button>
+
+                {attempt.result?.outcome === 'correct' && (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleNextProblem}
+                  >
+                    Next problem
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 3. REVEALED STATE: Verdict with editorial and reference solution tabs */}
+          {isRevealed && (
+            <div style={{ marginTop: 'var(--space-6)' }}>
+              <CodeVerdict
+                verdict={codeVerdictInfo?.verdict || attempt.result?.verdict || 'accepted'}
+                failedGroupLabel={codeVerdictInfo?.failedGroupLabel || attempt.result?.failedGroupLabel}
+                failedGroupFingerprint={codeVerdictInfo?.failedGroupFingerprint || attempt.result?.failedGroupFingerprint}
+                isRated={codeVerdictInfo?.isRated !== undefined ? codeVerdictInfo.isRated : attempt.rated}
+                isRevealed={true}
+                editorial={attempt.reveal?.editorial}
+                referenceSolutions={attempt.reveal?.referenceSolutions}
+              />
+
+              {user && (
+                <InsightInput
+                  userId={user.id}
+                  attemptId={attempt.id}
+                  conceptId={attempt.concept.id}
+                />
+              )}
+
+              <div style={{ marginTop: 'var(--space-6)', display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleNextProblem}
+                >
+                  Next problem
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        /* STANDARD (NON-CODE) PROBLEM VIEW */
+        <>
+          {/* Problem Prompt */}
           <div
+            className="form-card"
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginTop: 'var(--space-6)',
-              paddingTop: 'var(--space-4)',
-              borderTop: '1px solid var(--border)',
+              marginBottom: 'var(--space-6)',
+              padding: 'var(--space-5)',
             }}
           >
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleCommit}
-              disabled={!canCommit}
-            >
-              {commitAction.pending ? 'Committing...' : 'Commit'}
-            </button>
-
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => setShowGiveUpConfirm(true)}
-              disabled={commitAction.pending || giveUpAction.pending}
-            >
-              I'm stuck
-            </button>
+            <PromptBlocks blocks={attempt.prompt} />
           </div>
-        </div>
+
+          {/* 1. PRESENTED STATE: Answer input, Confidence input, Commit, Give up */}
+          {isPresented && (
+            <div data-testid="presented-state" className="form-card" style={{ padding: 'var(--space-5)' }}>
+              <AnswerInput
+                spec={attempt.answerSpec}
+                value={draftAnswer}
+                onChange={setDraftAnswer}
+                disabled={commitAction.pending || giveUpAction.pending}
+                id="answer-input"
+              />
+
+              <ConfidenceInput
+                value={draftConfidence}
+                onChange={setDraftConfidence}
+                isCode={false}
+                disabled={commitAction.pending || giveUpAction.pending}
+                declaredHelp={declaredHelp}
+                onDeclaredHelpChange={setDeclaredHelp}
+              />
+
+              {commitAction.error && (
+                <div data-testid="commit-error" className="alert alert-error" role="alert" style={{ marginTop: 'var(--space-4)' }}>
+                  <div style={{ marginBottom: 'var(--space-2)' }}>
+                    {commitAction.error.message || 'Submission failed. Please retry.'}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleCommit}
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginTop: 'var(--space-6)',
+                  paddingTop: 'var(--space-4)',
+                  borderTop: '1px solid var(--border)',
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleCommit}
+                  disabled={!canCommit}
+                >
+                  {commitAction.pending ? 'Committing...' : 'Commit'}
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setShowGiveUpConfirm(true)}
+                  disabled={commitAction.pending || giveUpAction.pending}
+                >
+                  I'm stuck
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 2. RESOLVED & REVEALED STATE: Result Panel */}
+          {(isResolved || isRevealed) && attempt.result && (
+            <>
+              <ResultPanel
+                result={attempt.result}
+                ratingReveal={profile?.rating_reveal as 'each' | 'end_of_set' | undefined}
+              />
+
+              {/* Repair ladder trigger or active repair ladder */}
+              {canRepair && !isRevealed && (
+                <>
+                  {!repairActive ? (
+                    <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={async () => {
+                          setRepairActive(true)
+                          const initialStep = currentRepairStep || attempt.repair || attempt.result?.repair
+                          if (initialStep) {
+                            setCurrentRepairStep(initialStep)
+                          } else {
+                            try {
+                              const att = await api<AttemptView>(`/attempts/${attempt.id}`)
+                              if (att.repair) {
+                                setCurrentRepairStep(att.repair)
+                                setAttempt(att)
+                              }
+                            } catch (err: unknown) {
+                              setInitError(err instanceof Error ? err.message : 'Failed to load repair step')
+                            }
+                          }
+                        }}
+                      >
+                        Start repair ladder
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={handleReveal}
+                        disabled={revealAction.pending}
+                      >
+                        {revealAction.pending ? 'Revealing...' : 'Reveal solution'}
+                      </button>
+                    </div>
+                  ) : (
+                    currentRepairStep && (
+                      <RepairLadder
+                        attemptId={attempt.id}
+                        currentStep={currentRepairStep}
+                        totalSteps={attempt.result.repairTotal}
+                        onStepComplete={(next) => {
+                          if (next) {
+                            setCurrentRepairStep(next)
+                          } else {
+                            handleReveal()
+                          }
+                        }}
+                        onRevealClick={handleReveal}
+                      />
+                    )
+                  )}
+                </>
+              )}
+
+              {/* If outcome is correct and not yet revealed, show button to reveal solution */}
+              {!canRepair && !isRevealed && (
+                <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleReveal}
+                    disabled={revealAction.pending}
+                  >
+                    {revealAction.pending ? 'Revealing...' : 'Reveal solution'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleNextProblem}
+                  >
+                    Next problem
+                  </button>
+                </div>
+              )}
+
+              {/* Solution Reveal */}
+              {isRevealed && attempt.reveal && (
+                <>
+                  <Reveal
+                    solution={attempt.reveal.solution}
+                    earlierNote={attempt.reveal.earlierNote}
+                  />
+
+                  {user && (
+                    <InsightInput
+                      userId={user.id}
+                      attemptId={attempt.id}
+                      conceptId={attempt.concept.id}
+                    />
+                  )}
+
+                  <div style={{ marginTop: 'var(--space-6)', display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleNextProblem}
+                    >
+                      Next problem
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </>
       )}
 
       {/* "I'm stuck" confirmation modal */}
@@ -421,122 +966,6 @@ export function SetPlayer() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* 2. RESOLVED & REVEALED STATE: Result Panel */}
-      {(isResolved || isRevealed) && attempt.result && (
-        <>
-          <ResultPanel
-            result={attempt.result}
-            ratingReveal={profile?.rating_reveal as 'each' | 'end_of_set' | undefined}
-          />
-
-          {/* Repair ladder trigger or active repair ladder */}
-          {canRepair && !isRevealed && (
-            <>
-              {!repairActive ? (
-                <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={async () => {
-                      setRepairActive(true)
-                      const initialStep = currentRepairStep || attempt.repair || attempt.result?.repair
-                      if (initialStep) {
-                        setCurrentRepairStep(initialStep)
-                      } else {
-                        try {
-                          const att = await api<AttemptView>(`/attempts/${attempt.id}`)
-                          if (att.repair) {
-                            setCurrentRepairStep(att.repair)
-                            setAttempt(att)
-                          }
-                        } catch (err: unknown) {
-                          setInitError(err instanceof Error ? err.message : 'Failed to load repair step')
-                        }
-                      }
-                    }}
-                  >
-                    Start repair ladder
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={handleReveal}
-                    disabled={revealAction.pending}
-                  >
-                    {revealAction.pending ? 'Revealing...' : 'Reveal solution'}
-                  </button>
-                </div>
-              ) : (
-                currentRepairStep && (
-                  <RepairLadder
-                    attemptId={attempt.id}
-                    currentStep={currentRepairStep}
-                    totalSteps={attempt.result.repairTotal}
-                    onStepComplete={(next) => {
-                      if (next) {
-                        setCurrentRepairStep(next)
-                      } else {
-                        handleReveal()
-                      }
-                    }}
-                    onRevealClick={handleReveal}
-                  />
-                )
-              )}
-            </>
-          )}
-
-          {/* If outcome is correct and not yet revealed, show button to reveal solution */}
-          {!canRepair && !isRevealed && (
-            <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleReveal}
-                disabled={revealAction.pending}
-              >
-                {revealAction.pending ? 'Revealing...' : 'Reveal solution'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleNextProblem}
-              >
-                Next problem
-              </button>
-            </div>
-          )}
-
-          {/* Solution Reveal */}
-          {isRevealed && attempt.reveal && (
-            <>
-              <Reveal
-                solution={attempt.reveal.solution}
-                earlierNote={attempt.reveal.earlierNote}
-              />
-
-              {user && (
-                <InsightInput
-                  userId={user.id}
-                  attemptId={attempt.id}
-                  conceptId={attempt.concept.id}
-                />
-              )}
-
-              <div style={{ marginTop: 'var(--space-6)', display: 'flex', justifyContent: 'flex-end' }}>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleNextProblem}
-                >
-                  Next problem
-                </button>
-              </div>
-            </>
-          )}
-        </>
       )}
     </div>
   )

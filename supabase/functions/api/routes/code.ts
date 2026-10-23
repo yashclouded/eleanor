@@ -242,12 +242,20 @@ export async function handleCodeSubmit(ctx: Ctx): Promise<Response> {
       )
     `
 
-    await tx`
-      update attempts
-      set state = 'judging',
-          declared_help = ${attempt.declared_help || Boolean(b.declaredHelp)}
-      where id = ${b.attemptId}
-    `
+    if (attempt.state === 'presented') {
+      await tx`
+        update attempts
+        set state = 'judging',
+            declared_help = ${attempt.declared_help || Boolean(b.declaredHelp)}
+        where id = ${b.attemptId}
+      `
+    } else {
+      await tx`
+        update attempts
+        set declared_help = ${attempt.declared_help || Boolean(b.declaredHelp)}
+        where id = ${b.attemptId}
+      `
+    }
 
     const responseData = { submissionId }
     await tx`
@@ -286,6 +294,7 @@ export async function handleGetCodeSubmission(ctx: Ctx): Promise<Response> {
       verdict: sub.verdict,
       failedGroup: sub.failed_group,
       compileOutput: sub.compile_output,
+      rated: Boolean(sub.rated),
     })
   }
 
@@ -504,6 +513,7 @@ export async function handleGetCodeSubmission(ctx: Ctx): Promise<Response> {
       verdict,
       failedGroup,
       compileOutput: null,
+      rated: Boolean(lockedSub.rated),
     })
   })
 }
