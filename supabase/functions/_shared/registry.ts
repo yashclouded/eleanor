@@ -3,6 +3,9 @@ import type { CodeProblem } from './content/code/types.ts'
 import { baseRateScreeningTemplate } from './content/judgment/base-rate-screening.ts'
 import { knightsTwoTemplate } from './content/logic/knights-two.ts'
 import { JUDGMENT_CARDS } from './content/cards/judgment.ts'
+import { LOGIC_CARDS } from './content/cards/logic.ts'
+import { MATH_CARDS } from './content/cards/math.ts'
+import { CODE_CARDS } from './content/cards/code.ts'
 import { rangeSumsProblem } from './content/code/code.prefix.range-sums.ts'
 import { robotWalkProblem } from './content/code/code.implementation.robot-walk.ts'
 
@@ -23,7 +26,12 @@ export const TEMPLATES: Template<any>[] = [
   knightsTwoTemplate,
 ]
 
-export const CARDS: ConceptCard[] = [...JUDGMENT_CARDS]
+export const CARDS: ConceptCard[] = [
+  ...JUDGMENT_CARDS,
+  ...LOGIC_CARDS,
+  ...MATH_CARDS,
+  ...CODE_CARDS,
+]
 
 /**
  * Resolves a template and difficulty level from an item ID string.

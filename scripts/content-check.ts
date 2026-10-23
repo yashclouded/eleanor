@@ -1,8 +1,8 @@
 import { isCorrect } from '../supabase/functions/_shared/grading.ts'
 import { hashSeed, makeRng } from '../supabase/functions/_shared/rng.ts'
 import { CONCEPTS } from '../supabase/functions/_shared/catalog.ts'
-import { TEMPLATES, CODE_PROBLEMS } from '../supabase/functions/_shared/registry.ts'
-import type { Concept, Template } from '../supabase/functions/_shared/content/types.ts'
+import { TEMPLATES, CODE_PROBLEMS, CARDS } from '../supabase/functions/_shared/registry.ts'
+import type { Concept, Template, ConceptCard, Block } from '../supabase/functions/_shared/content/types.ts'
 import type { CodeProblem } from '../supabase/functions/_shared/content/code/types.ts'
 
 /**
@@ -350,7 +350,122 @@ export function checkCodeProblem(problem: CodeProblem, concepts: Concept[]): str
 }
 
 /**
- * Checks all templates, code problems, and bank configuration.
+ * Computes word count across structured content blocks.
+ */
+export function countBlockWords(blocks: Block[]): number {
+  let text = ''
+  for (const b of blocks) {
+    switch (b.t) {
+      case 'p':
+      case 'note':
+      case 'code':
+        text += ' ' + b.text
+        break
+      case 'list':
+        text += ' ' + b.items.join(' ')
+        break
+      case 'table':
+        text += ' ' + b.head.join(' ') + ' ' + b.rows.map((r) => r.join(' ')).join(' ')
+        if (b.caption) text += ' ' + b.caption
+        break
+    }
+  }
+  return text.trim().split(/\s+/).filter(Boolean).length
+}
+
+/**
+ * Checks concept cards rules.
+ * Rules:
+ * - Every concept has a card
+ * - No duplicate cards
+ * - Plain text and tables only (no code blocks)
+ * - Word count is between 120 and 400 words
+ * - Contains worked example and common traps
+ */
+export function checkConceptCards(
+  cards: ConceptCard[],
+  concepts: Concept[] = CONCEPTS,
+): string[] {
+  const errors: string[] = []
+  const conceptMap = new Map(concepts.map((c) => [c.id, c]))
+  const seenCards = new Set<string>()
+
+  for (const card of cards) {
+    if (!card.conceptId || typeof card.conceptId !== 'string') {
+      errors.push(`Concept card has invalid conceptId: ${card.conceptId}`)
+      continue
+    }
+
+    if (seenCards.has(card.conceptId)) {
+      errors.push(`Duplicate concept card for: ${card.conceptId}`)
+    }
+    seenCards.add(card.conceptId)
+
+    if (!conceptMap.has(card.conceptId)) {
+      errors.push(`Concept card references non-existent concept: ${card.conceptId}`)
+    }
+
+    if (!card.version || card.version < 1) {
+      errors.push(`Concept card ${card.conceptId} has invalid version: ${card.version}`)
+    }
+
+    if (card.status === 'published') {
+      if (!card.review?.reviewer || !card.review?.reviewedAt) {
+        errors.push(
+          `Concept card ${card.conceptId} is marked 'published' but missing reviewer or reviewedAt`,
+        )
+      }
+    }
+
+    // Check blocks are plain text and tables only (no code blocks)
+    for (const b of card.body) {
+      if (b.t === 'code') {
+        errors.push(
+          `Concept card ${card.conceptId} contains code block (plain text and tables only)`,
+        )
+      }
+    }
+
+    // Check word count between 120 and 400 words
+    const words = countBlockWords(card.body)
+    if (words < 120 || words > 400) {
+      errors.push(
+        `Concept card ${card.conceptId} word count (${words}) must be between 120 and 400 words`,
+      )
+    }
+
+    // Check presence of worked example and common traps
+    const fullText = card.body
+      .map((b) => (b.t === 'p' || b.t === 'note' ? b.text : b.t === 'list' ? b.items.join(' ') : ''))
+      .join(' ')
+      .toLowerCase()
+
+    const hasExample = fullText.includes('worked example') || fullText.includes('example:')
+    const hasTraps =
+      fullText.includes('common trap') ||
+      fullText.includes('trap:') ||
+      fullText.includes('traps:')
+
+    if (!hasExample) {
+      errors.push(`Concept card ${card.conceptId} missing worked example`)
+    }
+    if (!hasTraps) {
+      errors.push(`Concept card ${card.conceptId} missing common traps`)
+    }
+  }
+
+  // Every concept in catalog has a card
+  for (const c of concepts) {
+    if (!seenCards.has(c.id)) {
+      errors.push(`Concept ${c.id} missing concept card`)
+    }
+  }
+
+  return errors
+}
+
+/**
+ * Checks all templates, code problems, concept cards, and bank configuration.
  */
 export function checkAll(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -358,6 +473,7 @@ export function checkAll(
   concepts: Concept[] = CONCEPTS,
   seedCount = 2000,
   codeProblems: CodeProblem[] = CODE_PROBLEMS,
+  cards: ConceptCard[] = CARDS,
 ): string[] {
   const errors: string[] = []
   errors.push(...checkBank(templates, concepts))
@@ -370,13 +486,15 @@ export function checkAll(
     errors.push(...checkCodeProblem(p, concepts))
   }
 
+  errors.push(...checkConceptCards(cards, concepts))
+
   return errors
 }
 
 // CLI entry point
 if (process.argv[1]?.endsWith('content-check.ts')) {
   console.log('Running Eleanor content checks...')
-  const errors = checkAll(TEMPLATES, CONCEPTS, 2000, CODE_PROBLEMS)
+  const errors = checkAll(TEMPLATES, CONCEPTS, 2000, CODE_PROBLEMS, CARDS)
 
   if (errors.length > 0) {
     console.error(`\n❌ Content checks failed with ${errors.length} error(s):`)
@@ -386,7 +504,7 @@ if (process.argv[1]?.endsWith('content-check.ts')) {
     process.exit(1)
   } else {
     console.log(
-      `\n✅ All content checks passed successfully (${TEMPLATES.length} templates, ${CODE_PROBLEMS.length} code problems checked).`,
+      `\n✅ All content checks passed successfully (${TEMPLATES.length} templates, ${CODE_PROBLEMS.length} code problems, ${CARDS.length} concept cards checked).`,
     )
     process.exit(0)
   }
