@@ -1,6 +1,19 @@
 import type { ConceptCard, Template } from './content/types.ts'
 import type { CodeProblem } from './content/code/types.ts'
+import { countingTableTemplate } from './content/judgment/counting-table.ts'
+import { fermiQuantityTemplate } from './content/judgment/fermi-quantity.ts'
+import { conditionalTwoWayTemplate } from './content/judgment/conditional-two-way-table.ts'
+import { conditionalTreeTemplate } from './content/judgment/conditional-tree.ts'
 import { baseRateScreeningTemplate } from './content/judgment/base-rate-screening.ts'
+import { baseRateTwoTestsTemplate } from './content/judgment/base-rate-two-tests.ts'
+import { expectedValueBetsTemplate } from './content/judgment/expected-value-bets.ts'
+import { expectedValueInsuranceTemplate } from './content/judgment/expected-value-insurance.ts'
+import { riskFramingRelativeAbsoluteTemplate } from './content/judgment/risk-framing-relative-absolute.ts'
+import { riskFramingNntTemplate } from './content/judgment/risk-framing-nnt.ts'
+import { independenceCompoundEventsTemplate } from './content/judgment/independence-compound-events.ts'
+import { independenceAtLeastOneTemplate } from './content/judgment/independence-at-least-one.ts'
+import { regressionSelectionEffectTemplate } from './content/judgment/regression-selection-effect.ts'
+import { oddsLikelihoodRatioTemplate } from './content/judgment/odds-likelihood-ratio.ts'
 import { knightsTwoTemplate } from './content/logic/knights-two.ts'
 import { JUDGMENT_CARDS } from './content/cards/judgment.ts'
 import { LOGIC_CARDS } from './content/cards/logic.ts'
@@ -22,7 +35,20 @@ export const CODE_PROBLEMS: CodeProblem[] = [
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const TEMPLATES: Template<any>[] = [
+  countingTableTemplate,
+  fermiQuantityTemplate,
+  conditionalTwoWayTemplate,
+  conditionalTreeTemplate,
   baseRateScreeningTemplate,
+  baseRateTwoTestsTemplate,
+  expectedValueBetsTemplate,
+  expectedValueInsuranceTemplate,
+  riskFramingRelativeAbsoluteTemplate,
+  riskFramingNntTemplate,
+  independenceCompoundEventsTemplate,
+  independenceAtLeastOneTemplate,
+  regressionSelectionEffectTemplate,
+  oddsLikelihoodRatioTemplate,
   knightsTwoTemplate,
 ]
 

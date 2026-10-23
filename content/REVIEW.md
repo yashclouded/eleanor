@@ -46,11 +46,24 @@ Per Eleanor review guidelines, every content item begins in \`draft\` status. It
 
 ---
 
-## Templates (2)
+## Templates (15)
 
 | ID | Type | Status | Author | Reviewer | Date | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| \`judgment.base-rate.screening\` | Template | draft | Eleanor Team | | | Task 1.3 reference template (Base rate screening) |
+| \`judgment.frequencies.counting-table\` | Template | draft | Eleanor Team | | | Natural frequencies in 2x2 contingency tables |
+| \`judgment.estimation.fermi-quantity\` | Template | draft | Eleanor Team | | | Fermi estimation and multi-factor volume scaling |
+| \`judgment.conditional.two-way-table\` | Template | draft | Eleanor Team | | | Conditional probability in two-way frequency tables |
+| \`judgment.conditional.tree\` | Template | draft | Eleanor Team | | | Conditional probability trees and sequential branching |
+| \`judgment.base-rate.screening\` | Template | draft | Eleanor Team | | | Base rate screening and diagnostic test posterior |
+| \`judgment.base-rate.two-tests\` | Template | draft | Eleanor Team | | | Sequential independent screening and multi-stage updating |
+| \`judgment.expected-value.bets\` | Template | draft | Eleanor Team | | | Expected value of asymmetric wagers and decision lotteries |
+| \`judgment.expected-value.insurance\` | Template | draft | Eleanor Team | | | Expected insurance loss, deductibles, and actuarial pricing |
+| \`judgment.risk-framing.relative-absolute\` | Template | draft | Eleanor Team | | | Relative risk reduction vs absolute risk reduction framing |
+| \`judgment.risk-framing.nnt\` | Template | draft | Eleanor Team | | | Number needed to treat (NNT) and reciprocal absolute risk reduction |
+| \`judgment.independence.compound-events\` | Template | draft | Eleanor Team | | | Independent compound events, multiplication rule, and joint probabilities |
+| \`judgment.independence.at-least-one\` | Template | draft | Eleanor Team | | | Complement rule for at-least-one occurrence across independent trials |
+| \`judgment.regression.selection-effect\` | Template | draft | Eleanor Team | | | Regression to the mean from extreme baseline scores |
+| \`judgment.odds.likelihood-ratio\` | Template | draft | Eleanor Team | | | Prior odds, Bayes factor likelihood ratios, and posterior odds |
 | \`logic.knights-two\` | Template | draft | Eleanor Team | | | Task 1.3 reference template (Knights & Knaves 2 persons) |
 
 ---
