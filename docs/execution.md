@@ -1491,7 +1491,7 @@ Implement, run, paste output. Commit: "feat(web): code editor, run, submit and v
 
 **Done when:**
 
-- [ ] The e2e cases pass.
+- [x] The e2e cases pass.
 
 ---
 
