@@ -12,6 +12,8 @@ import { RepairLadder, type RepairStepData } from '../components/RepairLadder.ts
 import { Reveal } from '../components/Reveal.tsx'
 import { InsightInput } from '../components/InsightInput.tsx'
 import { useAuth } from '../lib/auth.tsx'
+import { useOutcomeSound } from '../lib/useOutcomeSound.ts'
+import { prepareSound } from '../lib/feedback.ts'
 
 interface DailyStats {
   number: number
@@ -35,6 +37,7 @@ export function Daily() {
 
   const [dailyNumber, setDailyNumber] = useState<number | null>(null)
   const [attempt, setAttempt] = useState<AttemptView | null>(null)
+  useOutcomeSound(attempt)
   const [stats, setStats] = useState<DailyStats | null>(null)
 
   // Draft inputs
@@ -138,6 +141,7 @@ export function Daily() {
     if (!attempt || draftConfidence === null) return
     const parsed = parseAnswer(attempt.answerSpec, draftAnswer)
     if (!parsed.ok) return
+    void prepareSound()
 
     try {
       const res = await commitAction.run({
@@ -173,6 +177,7 @@ export function Daily() {
   const handleConfirmGiveUp = async () => {
     setShowGiveUpConfirm(false)
     if (!attempt) return
+    void prepareSound()
 
     try {
       const res = await giveUpAction.run({})

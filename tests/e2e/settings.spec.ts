@@ -20,6 +20,8 @@ const testSql = postgres(
 const MAILPIT_URL = 'http://127.0.0.1:54324'
 
 async function checkA11y(page: Page, contextName: string) {
+  await page.locator('main').evaluate((element) => Promise.all(element.getAnimations({ subtree: true })
+    .filter((animation) => animation.effect?.getTiming().iterations !== Infinity).map((animation) => animation.finished)))
   const results = await new AxeBuilder({ page }).analyze()
   const seriousViolations = results.violations.filter((v) =>
     ['serious', 'critical'].includes(v.impact ?? '')
@@ -112,8 +114,8 @@ test.describe('Task 4.6: Settings, Landing, and Legal pages', () => {
     const functionCalls: string[] = []
     page.on('request', (req) => {
       const url = req.url()
-      // Catch backend Edge Function calls, ignoring Vite dev-server module loads
-      if (url.includes(':54321/functions') || (url.includes('/functions') && !url.includes(':5173'))) {
+      // Match the API path so Vite's shared-module imports work on any dev port.
+      if (new URL(url).pathname.startsWith('/functions/v1/')) {
         functionCalls.push(url)
       }
     })

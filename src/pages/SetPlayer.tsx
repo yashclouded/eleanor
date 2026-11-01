@@ -15,6 +15,8 @@ import { InsightInput } from '../components/InsightInput.tsx'
 import { SetSummary, type SetSummaryData } from '../components/SetSummary.tsx'
 import { CodeEditor, type RunResult } from '../components/CodeEditor.tsx'
 import { CodeVerdict } from '../components/CodeVerdict.tsx'
+import { useOutcomeSound } from '../lib/useOutcomeSound.ts'
+import { prepareSound } from '../lib/feedback.ts'
 
 export function SetPlayer() {
   const { setId } = useParams<{ setId: string }>()
@@ -26,6 +28,7 @@ export function SetPlayer() {
 
   // Current Attempt state
   const [attempt, setAttempt] = useState<AttemptView | null>(null)
+  useOutcomeSound(attempt)
   const [isDone, setIsDone] = useState(false)
   const [summary, setSummary] = useState<SetSummaryData | null>(null)
 
@@ -218,6 +221,7 @@ export function SetPlayer() {
     if (!attempt || draftConfidence === null) return
     const parsed = parseAnswer(attempt.answerSpec, draftAnswer)
     if (!parsed.ok) return
+    void prepareSound()
 
     try {
       const res = await commitAction.run({
@@ -260,6 +264,7 @@ export function SetPlayer() {
   const handleSubmitCode = async () => {
     if (!attempt || !codeSource.trim() || isJudging) return
     if (attempt.state === 'presented' && draftConfidence === null) return
+    void prepareSound()
     setIsJudging(true)
     setCodeSubmitError(null)
     setCodeCompileError(null)
@@ -358,6 +363,7 @@ export function SetPlayer() {
   const handleConfirmGiveUp = async () => {
     setShowGiveUpConfirm(false)
     if (!attempt) return
+    void prepareSound()
 
     try {
       const res = await giveUpAction.run({})

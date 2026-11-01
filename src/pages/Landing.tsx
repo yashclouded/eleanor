@@ -4,6 +4,9 @@ import type { AnswerSpec, RawAnswer } from '../../supabase/functions/_shared/con
 import { parseAnswer, isCorrect } from '../../supabase/functions/_shared/grading.ts'
 import { AnswerInput } from '../components/AnswerInput.tsx'
 import { ConfidenceInput } from '../components/ConfidenceInput.tsx'
+import { Icon } from '../components/Icon.tsx'
+import { ReasoningArt } from '../components/ReasoningArt.tsx'
+import { playOutcomeSound } from '../lib/feedback.ts'
 
 const SAMPLE_SPEC: AnswerSpec = {
   type: 'number',
@@ -30,6 +33,7 @@ export function Landing() {
     if (!parsed.ok) return
 
     const correct = isCorrect(SAMPLE_SPEC, SAMPLE_ANSWER, parsed.value)
+    void playOutcomeSound(correct ? 'correct' : 'incorrect')
     let misconceptionFeedback: string | undefined
 
     if (!correct && typeof parsed.value === 'number') {
@@ -49,6 +53,7 @@ export function Landing() {
   }
 
   const handleGiveUp = () => {
+    void playOutcomeSound('gave_up')
     setResolved({
       outcome: 'gave_up',
       statedConfidence: confidence,
@@ -65,95 +70,60 @@ export function Landing() {
   const canCommit = parsedForValidation.ok && confidence !== null
 
   return (
-    <div className="container-problem" style={{ paddingBottom: 'var(--space-12)' }}>
+    <div className="landing-page">
       {/* Hero section with one-line promise from doc.md */}
-      <section style={{ textAlign: 'center', marginTop: 'var(--space-8)', marginBottom: 'var(--space-10)' }}>
-        <h1 style={{ fontSize: '2.5rem', fontWeight: 800, letterSpacing: '-0.025em', marginBottom: 'var(--space-3)' }}>
-          Eleanor
-        </h1>
-        <p style={{ fontSize: '1.25rem', color: 'var(--text-muted)', marginBottom: 'var(--space-6)', fontWeight: 500 }}>
-          The rated gym for your own thinking
-        </p>
-        <blockquote
-          style={{
-            fontStyle: 'italic',
-            fontSize: '1.0625rem',
-            lineHeight: 1.6,
-            color: 'var(--text)',
-            background: 'var(--surface)',
-            borderLeft: '4px solid var(--accent)',
-            padding: 'var(--space-4) var(--space-5)',
-            borderRadius: 'var(--radius-sm)',
-            maxWidth: '640px',
-            margin: '0 auto var(--space-6)',
-            boxShadow: 'var(--shadow-sm)',
-          }}
-        >
-          Think first. Commit an answer and how sure you are. Get rated like a chess player. Prove it a week later on a problem you have never seen.
-        </blockquote>
-        <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
-          <Link to="/login" className="btn btn-primary" style={{ padding: 'var(--space-3) var(--space-6)' }}>
-            Start Practising
-          </Link>
-          <Link to="/login" className="btn btn-secondary" style={{ padding: 'var(--space-3) var(--space-6)' }}>
-            Sign in
-          </Link>
+      <section className="landing-hero">
+        <div className="hero-copy">
+          <p className="eyebrow"><span className="eyebrow-rule" /> A PRACTICE OF PRECISION</p>
+          <h1>Make room for<br /><em>clear thinking.</em></h1>
+          <p className="hero-description">The rated gym for your own thinking. A quiet space to work through hard problems, question your confidence, and revisit what you’ve learned.</p>
+          <div className="hero-actions">
+            <Link to="/login" className="btn btn-primary">Start Practising <Icon name="arrow" size={18} /></Link>
+            <a href="#sample" className="text-link">Try a problem <Icon name="arrow" size={16} /></a>
+          </div>
+          <p className="hero-note"><Icon name="shield" size={15} /> Your pace. Your perspective. No AI in the product.</p>
         </div>
+        <ReasoningArt />
       </section>
 
       {/* Three short explanations: Rating, Calibration, Echoes */}
-      <section style={{ marginBottom: 'var(--space-10)' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: 'var(--space-4)' }}>
-          How Eleanor works
-        </h2>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: 'var(--space-4)',
-          }}
-        >
-          <div className="card" style={{ padding: 'var(--space-4)' }}>
-            <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, color: 'var(--accent)', marginBottom: 'var(--space-2)' }}>
-              1. Rating
-            </h3>
+      <section className="practice-method" id="how-it-works">
+        <div className="method-intro"><p className="eyebrow">THE METHOD</p><h2>Think. Reflect.<br />Come back to it.</h2>
+          <p>Think first. Commit an answer and how sure you are. Get rated like a chess player. Prove it a week later on a problem you have never seen.</p>
+        </div>
+        <div className="method-steps">
+          <div className="feature-row">
+            <span className="feature-number">01</span><Icon name="chart" size={24} />
+            <div><h3>Rating</h3>
             <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
               Chess-style Glicko rating across Judgment, Logic, Math, and Code. Every problem is calibrated to match your current ability at an adaptive ~70% target success rate.
             </p>
-          </div>
+            </div></div>
 
-          <div className="card" style={{ padding: 'var(--space-4)' }}>
-            <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, color: 'var(--accent)', marginBottom: 'var(--space-2)' }}>
-              2. Calibration
-            </h3>
+          <div className="feature-row">
+            <span className="feature-number">02</span><Icon name="judgment" size={24} />
+            <div><h3>Calibration</h3>
             <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
               A two-number identity: how hard a problem you can solve, and whether you know when you are right. Stated confidence is tracked against reality with Brier scores and reliability curves.
             </p>
-          </div>
+            </div></div>
 
-          <div className="card" style={{ padding: 'var(--space-4)' }}>
-            <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, color: 'var(--accent)', marginBottom: 'var(--space-2)' }}>
-              3. Echoes
-            </h3>
+          <div className="feature-row">
+            <span className="feature-number">03</span><Icon name="echo" size={24} />
+            <div><h3>Echoes</h3>
             <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
               Mastery means retention and transfer. Proving a concept requires solving fresh variants spaced 1, 3, 7, and 21 days later, never from a single lucky attempt.
             </p>
-          </div>
+            </div></div>
         </div>
       </section>
 
       {/* Playable static sample problem (The factory example; unrated, client-side only) */}
       <section
-        style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)',
-          padding: 'var(--space-6)',
-          marginBottom: 'var(--space-10)',
-          boxShadow: 'var(--shadow-sm)',
-        }}
+        className="sample-section"
+        id="sample"
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+        <div className="sample-meta">
           <span
             style={{
               fontSize: '0.75rem',
@@ -172,6 +142,7 @@ export function Landing() {
             Track: Judgment
           </span>
         </div>
+        <h2 className="sample-heading">A small test of perspective.</h2>
 
         <div style={{ fontSize: '1.0625rem', lineHeight: 1.6, marginBottom: 'var(--space-6)' }}>
           <p style={{ marginBottom: 'var(--space-3)' }}>
@@ -203,7 +174,7 @@ export function Landing() {
                 onClick={handleCommit}
                 disabled={!canCommit}
               >
-                Commit answer
+                Commit answer <Icon name="arrow" size={17} />
               </button>
               <button
                 type="button"
@@ -218,6 +189,7 @@ export function Landing() {
           <div style={{ marginTop: 'var(--space-4)' }}>
             {/* Result banner */}
             <div
+              className="result-reveal"
               style={{
                 padding: 'var(--space-4)',
                 borderRadius: 'var(--radius-md)',
@@ -233,7 +205,8 @@ export function Landing() {
                 marginBottom: 'var(--space-4)',
               }}
             >
-              <div style={{ fontWeight: 700, fontSize: '1.125rem', marginBottom: 'var(--space-1)' }}>
+              <div className="outcome-heading" style={{ fontWeight: 700, fontSize: '1.125rem', marginBottom: 'var(--space-1)' }}>
+                <Icon name={resolved.outcome === 'correct' ? 'check' : resolved.outcome === 'gave_up' ? 'flag' : 'cross'} />
                 {resolved.outcome === 'correct'
                   ? 'Correct'
                   : resolved.outcome === 'gave_up'
@@ -319,7 +292,7 @@ export function Landing() {
       </section>
 
       {/* Footer links */}
-      <footer
+      <footer className="landing-footer"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -331,7 +304,7 @@ export function Landing() {
         }}
       >
         <div>
-          Eleanor · No AI in the product · Pure deterministic grading
+          Eleanor · No AI in the product
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
           <Link to="/terms" style={{ color: 'var(--text-dim)' }}>

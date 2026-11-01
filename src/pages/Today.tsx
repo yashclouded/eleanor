@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { api, type AttemptView } from '../lib/api.ts'
 import { TitleBadge } from '../components/TitleBadge.tsx'
+import { Icon, type IconName } from '../components/Icon.tsx'
 import {
   inflate,
   isProvisional,
@@ -17,6 +18,13 @@ interface TrackRatingRow {
   n: number
   peak: number
   last_at: string | null
+}
+
+const TRACK_DETAILS: Record<string, { icon: IconName; description: string }> = {
+  judgment: { icon: 'judgment', description: 'Weigh the evidence. Make the call.' },
+  logic: { icon: 'logic', description: 'Follow the argument. Find the structure.' },
+  math: { icon: 'math', description: 'Look for patterns. Reason precisely.' },
+  code: { icon: 'code', description: 'Turn a clear idea into working code.' },
 }
 
 function computeWeeklyActiveDays(
@@ -204,8 +212,9 @@ export function Today() {
 
   return (
     <div className="container-dashboard" data-testid="today-container">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-6)' }}>
+      <div className="page-intro">
         <div>
+          <p className="eyebrow">YOUR PRACTICE, AT A GLANCE</p>
           <h1 style={{ fontSize: '1.75rem', marginBottom: 'var(--space-1)' }}>
             Welcome back, {profile?.handle ?? 'Learner'}
           </h1>
@@ -213,6 +222,7 @@ export function Today() {
             Your daily training session, active tracks, and retention reviews.
           </p>
         </div>
+        <span className="date-note"><Icon name="calendar" size={16} />{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}</span>
       </div>
 
       {error && (
@@ -224,14 +234,15 @@ export function Today() {
       {/* Top 3 Summary Cards: Weekly Goal, Daily Crux, Due Echoes */}
       <section className="dashboard-grid" aria-label="Daily summary">
         {/* 1. Weekly Goal Dots Card */}
-        <div className="dashboard-card" data-testid="weekly-goal-card">
+        <div className="dashboard-card dashboard-card--goal" data-testid="weekly-goal-card">
           <div>
-            <h2 className="dashboard-card-title">Weekly Goal</h2>
+            <h2 className="dashboard-card-title"><Icon name="calendar" size={18} />Weekly Goal</h2>
             <div style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
               {distinctActiveDays} / {weeklyGoal} days
             </div>
             <div
               className="weekly-dots"
+              role="group"
               data-testid="weekly-dots"
               aria-label={`Weekly goal: ${distinctActiveDays} of ${weeklyGoal} days completed`}
             >
@@ -242,6 +253,7 @@ export function Today() {
                     key={i}
                     data-testid={isFilled ? 'weekly-dot-filled' : 'weekly-dot'}
                     className={`weekly-dot ${isFilled ? 'filled' : 'empty'}`}
+                    role="img"
                     aria-label={`Day ${i + 1}: ${isFilled ? 'completed' : 'not completed'}`}
                   />
                 )
@@ -254,10 +266,10 @@ export function Today() {
         </div>
 
         {/* 2. Daily Crux Card */}
-        <div className="dashboard-card" data-testid="daily-crux-card">
+        <div className="dashboard-card dashboard-card--daily" data-testid="daily-crux-card">
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
-              <h2 className="dashboard-card-title">Daily Crux</h2>
+              <h2 className="dashboard-card-title"><Icon name="compass" size={18} />Daily Crux</h2>
               <span
                 data-testid="daily-status"
                 className={`status-badge ${dailySolved ? 'solved' : 'unsolved'}`}
@@ -278,14 +290,14 @@ export function Today() {
             className="btn btn-secondary btn-sm"
             style={{ width: 'fit-content' }}
           >
-            {dailySolved ? 'View results' : "Play today's Crux"}
+            {dailySolved ? 'View results' : "Play today's Crux"} <Icon name="arrow" size={16} />
           </Link>
         </div>
 
         {/* 3. Due Echoes Card */}
-        <div className="dashboard-card" data-testid="due-echoes-card">
+        <div className="dashboard-card dashboard-card--echoes" data-testid="due-echoes-card">
           <div>
-            <h2 className="dashboard-card-title">Due Echoes</h2>
+            <h2 className="dashboard-card-title"><Icon name="echo" size={18} />Due Echoes</h2>
             <div
               data-testid="due-echoes-count"
               style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text)', marginBottom: 'var(--space-2)' }}
@@ -330,11 +342,13 @@ export function Today() {
               return (
                 <div key={track} className="track-card" data-testid={`track-card-${track}`}>
                   <div className="track-card-header">
+                    <span className="track-symbol"><Icon name={TRACK_DETAILS[track]?.icon ?? 'compass'} size={25} /></span>
                     <span className="track-card-title">{track}</span>
                     <TitleBadge title={titleName} />
                   </div>
 
                   <div className="track-card-body">
+                    <p className="track-description">{TRACK_DETAILS[track]?.description}</p>
                     <div className="track-rating-row">
                       <span className="track-rating-value">{displayRating}</span>
                       {provisional && (
@@ -363,7 +377,7 @@ export function Today() {
                         onClick={() => handleResumeSet(openSetId)}
                         aria-label={`Resume ${track} set`}
                       >
-                        Resume {track} set
+                        Resume {track} set <Icon name="arrow" size={17} />
                       </button>
                     ) : (
                       <button
@@ -373,7 +387,7 @@ export function Today() {
                         disabled={startingTrack !== null}
                         aria-label={`Start ${track} set`}
                       >
-                        {startingTrack === track ? 'Starting...' : `Start ${track} set`}
+                        {startingTrack === track ? 'Starting...' : `Start ${track} set`} <Icon name="arrow" size={17} />
                       </button>
                     )}
                   </div>

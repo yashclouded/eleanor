@@ -1,4 +1,5 @@
 import { title as getTitle } from '../../supabase/functions/_shared/model.ts'
+import { Icon } from './Icon.tsx'
 
 export interface TitleBadgeProps {
   title?: string
@@ -15,7 +16,7 @@ export function TitleBadge({ title, rating, className = '' }: TitleBadgeProps) {
       className={`title-badge title-${slug} ${className}`.trim()}
       data-testid="title-badge"
     >
-      {displayTitle}
+      <Icon name={slug === 'novice' ? 'medal' : 'trophy'} size={13} />{displayTitle}
     </span>
   )
 }
