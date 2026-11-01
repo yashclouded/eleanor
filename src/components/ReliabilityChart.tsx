@@ -24,6 +24,8 @@ export function ReliabilityChart({
   // Omit empty bins (n === 0)
   const activeLearnerBins = learnerBins.filter((b) => b.n > 0)
   const activeModelBins = modelBins ? modelBins.filter((b) => b.n > 0) : []
+  const modelOnly = activeLearnerBins.length === 0 && activeModelBins.length > 0
+  const tableBins = modelOnly ? activeModelBins : activeLearnerBins
 
   // SVG dimensions (square plot for 1:1 probability calibration)
   const width = 420
@@ -57,7 +59,7 @@ export function ReliabilityChart({
         }, '')
       : ''
 
-  const ariaLabel = `Reliability diagram: predicted probability vs observed accuracy across ${activeLearnerBins.length} populated confidence bins`
+  const ariaLabel = `Reliability diagram: predicted probability vs observed accuracy across ${tableBins.length} populated confidence bins`
 
   return (
     <div className="chart-card" data-testid="reliability-chart-container">
@@ -242,10 +244,10 @@ export function ReliabilityChart({
 
         {/* Legend */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-4)', marginTop: 'var(--space-2)', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+          {!modelOnly && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}>
             <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
             You
-          </span>
+          </span>}
           {activeModelBins.length > 0 && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}>
               <span style={{ width: 8, height: 8, background: 'var(--title-strategist)', display: 'inline-block' }} />
@@ -271,9 +273,11 @@ export function ReliabilityChart({
             <thead>
               <tr>
                 <th scope="col">Bin</th>
-                <th scope="col">Learner (n)</th>
-                <th scope="col">Mean Confidence</th>
-                <th scope="col">Accuracy</th>
+                {!modelOnly && <>
+                  <th scope="col">Learner (n)</th>
+                  <th scope="col">Mean Confidence</th>
+                  <th scope="col">Accuracy</th>
+                </>}
                 {activeModelBins.length > 0 && (
                   <>
                     <th scope="col">Model (n)</th>
@@ -284,20 +288,20 @@ export function ReliabilityChart({
               </tr>
             </thead>
             <tbody>
-              {activeLearnerBins.map((b, idx) => {
+              {tableBins.map((b, idx) => {
                 const mb = activeModelBins[idx]
                 return (
                   <tr key={idx}>
                     <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
                       {`${b.lo.toFixed(1)}–${b.hi.toFixed(1)}`}
                     </td>
-                    <td>{`n=${b.n}`}</td>
+                    {!modelOnly && <><td>{`n=${b.n}`}</td>
                     <td style={{ fontFamily: 'var(--font-mono)' }}>
                       {`${Math.round(b.meanP * 100)}%`}
                     </td>
                     <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
                       {`${Math.round(b.meanY * 100)}%`}
-                    </td>
+                    </td></>}
                     {activeModelBins.length > 0 && (
                       <>
                         <td>{mb ? `n=${mb.n}` : '—'}</td>

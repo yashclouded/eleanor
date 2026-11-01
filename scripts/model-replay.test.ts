@@ -69,6 +69,13 @@ describe('deterministic ERM-1 replay', () => {
     expect(() => replayRatings([{ ...anchor, anchored_at: null }], [], tracks, concepts)).toThrow(/anchor timestamp/i)
   })
 
+  it('uses the audited anchor values even if the current item rating drifted', () => {
+    const anchor = { ...item, anchor: true, rating: 1400, rd: 100,
+      anchored_at: new Date('2026-01-01T00:30:00Z'), anchor_rating: 975, anchor_rd: 35 }
+    const replay = replayRatings([anchor], [attempt(0), attempt(31)], tracks, concepts)
+    expect(replay.items[0]).toMatchObject({ rating: 975, rd: 35 })
+  })
+
   it('orders simultaneous attempts by id and fails closed on missing content versions', () => {
     const a = attempt(1)
     const b = attempt(2, { resolved_at: a.resolved_at })
@@ -116,6 +123,7 @@ describe.runIf(process.env.REPLAY_DB_TESTS === '1')('replay against live API res
     await sql.unsafe(await readFile(new URL('../supabase/seed.sql', import.meta.url), 'utf8'))
     const functions = await readFile(new URL('../supabase/migrations/0003_functions_cron.sql', import.meta.url), 'utf8')
     await sql.unsafe(functions.split('-- 3. Materialized View: public.leaderboard')[1].split('-- 4. Function')[0])
+    await sql.unsafe(await readFile(new URL('../supabase/migrations/0005_model_health.sql', import.meta.url), 'utf8'))
     // pg_cron lives only in the parent database; integrity.test.ts verifies the actual schedule.
     const migration = await readFile(new URL('../supabase/migrations/0006_integrity.sql', import.meta.url), 'utf8')
     await sql.unsafe(migration.slice(0, migration.lastIndexOf('select cron.schedule(')))
@@ -162,7 +170,8 @@ describe.runIf(process.env.REPLAY_DB_TESTS === '1')('replay against live API res
       'concepts', (select jsonb_agg(c order by user_id, concept_id) from concept_ratings c),
       'items', (select jsonb_agg(i order by id) from items i),
       'events', (select jsonb_agg(e order by id) from rating_events e),
-      'attempts', (select jsonb_agg(a order by id) from attempts a)
+      'attempts', (select jsonb_agg(a order by id) from attempts a),
+      'moderation', (select jsonb_agg(m order by id) from moderation_actions m)
     ) as data`
   }
 
@@ -202,23 +211,45 @@ describe.runIf(process.env.REPLAY_DB_TESTS === '1')('replay against live API res
     expect(await snapshot()).toEqual(before)
   })
 
+  async function moderate(target: 'user' | 'item', id: string, operation: string) {
+    const { handleModerateUser, handleModerateItem } = await import(new URL('../supabase/functions/api/routes/admin.ts', import.meta.url).href)
+    const path = target === 'user' ? `users/${id}/action` : `items/${id}/${operation}`
+    const response = await (target === 'user' ? handleModerateUser : handleModerateItem)({
+      userId: users[2], isAdmin: true, params: { id },
+      req: new Request(`http://localhost/api/admin/${path}`, { method: 'POST',
+        headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+          transitionId: crypto.randomUUID(), reason: 'Reviewed disposable replay fixture', action: operation,
+        }) }),
+    })
+    expect(response.status).toBe(200)
+    const result = await response.json()
+    return result.data.actionId as string
+  }
+
   it('unrates one learner, propagates only item effects, and atomically applies a stable replay', async () => {
     const before = (await snapshot())[0].data
-    await sql`update attempts set rated = false where user_id = ${users[0]}`
+    const actionId = await moderate('user', users[0], 'unrate')
+    const [pending] = await sql`select * from moderation_actions where id = ${actionId}`
+    expect(pending.params.replayPending).toBe(true)
     const { replay } = await sql.begin(tx => loadReplay(tx))
     const track = (user: string) => replay.tracks.find(t => t.user_id === user)!
     expect(track(users[0])).toMatchObject({ rating: 1200, rd: 350, n: 0 })
     expect(track(users[1]).rating).not.toBe(before.tracks.find((t: { user_id: string }) => t.user_id === users[1]).rating)
     expect(Math.abs(track(users[2]).rating - before.tracks.find((t: { user_id: string }) => t.user_id === users[2]).rating)).toBeLessThan(1e-9)
     expect(Math.abs(replay.items.find(i => i.id === 'independent')!.rating - before.items.find((i: { id: string }) => i.id === 'independent').rating)).toBeLessThan(1e-9)
+    const dryRun = await snapshot()
+    await runReplay(sql)
+    expect(await snapshot()).toEqual(dryRun)
     await runReplay(sql, { apply: true, date: new Date('2026-11-01') })
+    const [completed] = await sql`select * from moderation_actions where id = ${actionId}`
+    expect(completed).toEqual({ ...pending, params: { ...pending.params, replayPending: false } })
     expect((await sql`select distinct model_version from rating_events`).map(e => e.model_version)).toEqual(['erm-1+replay-2026-11-01'])
     expect((await sql`select count(*)::int as n from attempts`)[0].n).toBe(180)
     expect((await sql`select count(*)::int as n from rating_events where user_id = ${users[0]}`)[0].n).toBe(0)
     const applied = await snapshot()
     expect(Math.abs((await runReplay(sql)).overallMeanShift)).toBeLessThan(1e-9)
     expect(await snapshot()).toEqual(applied)
-    await sql`update items set status = 'retired' where id = 'shared'`
+    await moderate('item', 'shared', 'retire')
     const retired = await sql.begin(tx => loadReplay(tx))
     expect(retired.replay.events.some(e => e.subject_id === 'shared')).toBe(false)
     expect(retired.replay.tracks.find(t => t.user_id === users[1])!.n).toBe(0)
@@ -236,12 +267,24 @@ describe.runIf(process.env.REPLAY_DB_TESTS === '1')('replay against live API res
     await sql`drop function public.reject_replay_fixture()`
   })
 
-  it('captures the first anchor timestamp and keeps it on repeated admin updates', async () => {
-    const [first] = await sql`update items set anchor = true where id = 'independent' returning anchored_at`
+  it('replays the admin anchor snapshot and completes retirement only on a successful apply', async () => {
+    await sql`update items set n = 200 where id = 'independent'`
+    const actionId = await moderate('item', 'independent', 'anchor')
+    const [audit] = await sql`select params from moderation_actions where id = ${actionId}`
+    const [first] = await sql`select anchored_at from items where id = 'independent'`
     expect(first.anchored_at).toBeInstanceOf(Date)
     const [again] = await sql`update items set anchor = true, anchored_at = now() + interval '1 day'
       where id = 'independent' returning anchored_at`
     expect(again.anchored_at).toEqual(first.anchored_at)
+    await sql`update items set rating = rating + 100, rd = rd + 1 where id = 'independent'`
+    const before = await snapshot()
+    const { replay, report } = await sql.begin(tx => loadReplay(tx))
+    expect(replay.items.find(i => i.id === 'independent')).toMatchObject({ rating: audit.params.rating, rd: audit.params.rd })
+    expect(report.items.find(i => i.id === 'independent')!.shift).toBeCloseTo(-100, 9)
+    expect(await snapshot()).toEqual(before)
+    await runReplay(sql, { apply: true })
+    const [retirement] = await sql`select params from moderation_actions where params->>'operation' = 'retire'`
+    expect(retirement.params.replayPending).toBe(false)
   })
 
   it('replays a commit through the live HTTP handler with the real database transaction', async () => {

@@ -47,6 +47,7 @@ describe('integrity flags (transactional fixtures; no lasting database changes)'
       const improbable = flags.filter(f => f.user_id === ids[1] && f.kind === 'improbable_run')
       expect(improbable).toHaveLength(1)
       expect(improbable[0].detail.z).toBeCloseTo(Math.sqrt(30), 9)
+      expect(improbable[0].detail).toMatchObject({ n: 30, sumS: 30, sumE: 15, variance: 7.5 })
       expect(flags.filter(f => f.user_id === ids[2] || f.user_id === ids[3])).toHaveLength(0)
       expect(await tx`select id, leaderboard_visible, banned_at from profiles where id in ${tx(ids)} order by id`).toEqual(before)
       expect((await tx`select count(*)::int as n from attempts where user_id in ${tx(ids)} and rated`)[0].n).toBe(90)

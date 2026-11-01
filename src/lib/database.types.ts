@@ -50,6 +50,12 @@ isOneToOne: false
       foreignKeyName: "attempts_item_id_fkey"
       columns: ["item_id"]
 isOneToOne: false
+      referencedRelation: "admin_item_residuals"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "attempts_item_id_fkey"
+      columns: ["item_id"]
+isOneToOne: false
       referencedRelation: "items"
       referencedColumns: ["id"]
     },{
@@ -103,6 +109,12 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
+      foreignKeyName: "code_tests_item_id_fkey"
+      columns: ["item_id"]
+isOneToOne: false
+      referencedRelation: "admin_item_residuals"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "code_tests_item_id_fkey"
       columns: ["item_id"]
 isOneToOne: false
@@ -189,6 +201,12 @@ isOneToOne: false
       columns: ["instance_id"]
 isOneToOne: false
       referencedRelation: "instances"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "daily_item_id_fkey"
+      columns: ["item_id"]
+isOneToOne: false
+      referencedRelation: "admin_item_residuals"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "daily_item_id_fkey"
@@ -282,6 +300,12 @@ isOneToOne: true
       foreignKeyName: "instances_item_id_fkey"
       columns: ["item_id"]
 isOneToOne: false
+      referencedRelation: "admin_item_residuals"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "instances_item_id_fkey"
+      columns: ["item_id"]
+isOneToOne: false
       referencedRelation: "items"
       referencedColumns: ["id"]
     }
@@ -307,13 +331,13 @@ isOneToOne: false
                   ]
                 },"items": {
                   Row: {
-                    "anchor": boolean,"concept_id": string,"daily_eligible": boolean,"family_id": string,"id": string,"kind": string,"level": number,"n": number,"rating": number,"rd": number,"source_id": string,"source_version": number,"status": string,"track_id": string,"updated_at": string
+                    "anchor": boolean,"anchored_at": string | null,"concept_id": string,"daily_eligible": boolean,"family_id": string,"id": string,"kind": string,"level": number,"n": number,"rating": number,"rd": number,"source_id": string,"source_version": number,"status": string,"track_id": string,"updated_at": string
                   }
                   Insert: {
-                    "anchor"?: boolean,"concept_id": string,"daily_eligible"?: boolean,"family_id": string,"id": string,"kind": string,"level": number,"n"?: number,"rating": number,"rd": number,"source_id": string,"source_version": number,"status": string,"track_id": string,"updated_at"?: string
+                    "anchor"?: boolean,"anchored_at"?: string | null,"concept_id": string,"daily_eligible"?: boolean,"family_id": string,"id": string,"kind": string,"level": number,"n"?: number,"rating": number,"rd": number,"source_id": string,"source_version": number,"status": string,"track_id": string,"updated_at"?: string
                   }
                   Update: {
-                    "anchor"?: boolean,"concept_id"?: string,"daily_eligible"?: boolean,"family_id"?: string,"id"?: string,"kind"?: string,"level"?: number,"n"?: number,"rating"?: number,"rd"?: number,"source_id"?: string,"source_version"?: number,"status"?: string,"track_id"?: string,"updated_at"?: string
+                    "anchor"?: boolean,"anchored_at"?: string | null,"concept_id"?: string,"daily_eligible"?: boolean,"family_id"?: string,"id"?: string,"kind"?: string,"level"?: number,"n"?: number,"rating"?: number,"rd"?: number,"source_id"?: string,"source_version"?: number,"status"?: string,"track_id"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -578,7 +602,20 @@ isOneToOne: false
                 }
           }
           Views: {
-            "leaderboard": {
+            "admin_item_residuals": {
+                  Row: {
+                    "anchor": boolean | null,"id": string | null,"n": number | null,"rating": number | null,"rd": number | null,"residual": number | null,"status": string | null,"track_id": string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "items_track_id_fkey"
+      columns: ["track_id"]
+isOneToOne: false
+      referencedRelation: "tracks"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"leaderboard": {
                   Row: {
                     "handle": string | null,"n": number | null,"rank": number | null,"rating": number | null,"track_id": string | null
                   }
@@ -588,8 +625,16 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "close_stale_sets":
+            "admin_model_health":
+{ Args: { "window_days": number }; Returns: Json
+                           },
+"close_stale_sets":
 { Args: Record<PropertyKey, never>; Returns: undefined
+                           },
+"daily_stats":
+{ Args: { "p_day": string }; Returns: Json
+                           } |
+{ Args: { "p_day": string,"p_user_id"?: string }; Returns: Json
                            },
 "public_profile":
 { Args: { "p_handle": string }; Returns: Json

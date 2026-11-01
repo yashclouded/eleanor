@@ -6,6 +6,7 @@ import { applyResponse, masteryAfter, MODEL_VERSION, PARAMS, type MasteryState, 
 export type ReplayItem = {
   id: string; kind: 'generated' | 'code'; source_id: string; source_version: number; level: number
   rating: number; rd: number; n: number; anchor: boolean; anchored_at: Date | null
+  anchor_rating?: number | null; anchor_rd?: number | null
 }
 export type ReplayAttempt = {
   id: string; user_id: string; track_id: string; concept_id: string; item_id: string
@@ -42,7 +43,8 @@ export function replayRatings(items: ReplayItem[], attempts: ReplayAttempt[], tr
     return [i.id, { ...i, rating: initialRating(i), rd: PARAMS.rd0Item as number, n: 0 }]
   }))
   const entryRatings = new Map(concepts.map(c => [c.id, c.entry_rating]))
-  const frozen = new Map(items.filter(i => i.anchor).map(i => [i.id, i]))
+  const frozen = new Map(items.filter(i => i.anchor).map(i => [i.id,
+    { ...i, rating: i.anchor_rating ?? i.rating, rd: i.anchor_rd ?? i.rd }]))
   for (const t of tracks) trackMap.set(`${t.user_id}/${t.track_id}`, {
     ...t, rating: PARAMS.r0, rd: PARAMS.rd0Learner, n: 0, peak: PARAMS.r0, last_at: null,
   })
@@ -100,7 +102,19 @@ export function assertReplayTarget(databaseUrl: string, apply: boolean, confirmP
 }
 
 export async function loadReplay(tx: postgres.TransactionSql) {
-  const items = await tx<ReplayItem[]>`select id, kind, source_id, source_version, level, rating, rd, n, anchor, anchored_at from public.items where status <> 'retired' order by id`
+  const items = await tx<ReplayItem[]>`
+    select i.id, i.kind, i.source_id, i.source_version, i.level, i.rating, i.rd, i.n, i.anchor, i.anchored_at,
+      (anchor_note.params->>'rating')::double precision as anchor_rating,
+      (anchor_note.params->>'rd')::double precision as anchor_rd
+    from public.items i
+    left join lateral (
+      select m.params from public.moderation_actions m
+      where i.anchor and m.action = 'note' and m.params->>'operation' = 'anchor'
+        and m.params->>'itemId' = i.id
+        and (m.params->>'anchoredAt')::timestamptz = date_trunc('milliseconds', i.anchored_at)
+      order by m.created_at desc, m.id desc limit 1
+    ) anchor_note on true
+    where i.status <> 'retired' order by i.id`
   const attempts = await tx<ReplayAttempt[]>`select a.id, a.user_id, a.track_id, a.concept_id, a.item_id, a.kind, a.outcome, a.resolved_at
     from public.attempts a join public.items i on i.id = a.item_id
     where a.rated and i.status <> 'retired' and a.state in ('resolved', 'revealed')
@@ -130,12 +144,16 @@ export async function applyReplay(tx: postgres.TransactionSql, replay: ReturnTyp
   const modelVersion = `${MODEL_VERSION}+replay-${date.toISOString().slice(0, 10)}`
   for (const event of replay.events) await tx`insert into public.rating_events ${tx({ ...event, model_version: modelVersion })}`
   await tx`refresh materialized view public.leaderboard`
+  await tx`update public.moderation_actions
+    set params = jsonb_set(params, '{replayPending}', 'false'::jsonb)
+    where params->'replayPending' = 'true'::jsonb
+      and (action = 'unrate' or (action = 'note' and params->>'operation' = 'retire'))`
 }
 
 export async function runReplay(sql: postgres.Sql, options: { apply?: boolean; date?: Date } = {}) {
   return sql.begin(options.apply ? '' : 'isolation level repeatable read read only', async tx => {
     if (options.apply) await tx`lock table public.profiles, public.attempts, public.track_ratings,
-      public.concept_ratings, public.items, public.rating_events in share row exclusive mode`
+      public.concept_ratings, public.items, public.rating_events, public.moderation_actions in share row exclusive mode`
     const result = await loadReplay(tx)
     if (options.apply) await applyReplay(tx, result.replay, options.date ?? new Date())
     return result.report

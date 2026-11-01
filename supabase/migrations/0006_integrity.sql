@@ -1,6 +1,4 @@
 -- Preserve the actual anchor transition; updated_at also covers unrelated edits.
-alter table public.items add column if not exists anchored_at timestamptz;
-
 create function public.record_item_anchor()
 returns trigger language plpgsql set search_path = '' as $$
 begin
@@ -61,6 +59,7 @@ begin
       and a.outcome in ('correct', 'incorrect', 'gave_up')
   ), runs as (
     select user_id, track_id, sum(score) as wins, sum(forecast) as expected,
+      sum(forecast * (1 - forecast)) as variance,
       (sum(score) - sum(forecast)) / nullif(sqrt(sum(forecast * (1 - forecast))), 0) as z
     from ranked where rn <= 30
     group by user_id, track_id
@@ -69,7 +68,7 @@ begin
   )
   insert into public.integrity_flags (user_id, track_id, kind, detail)
   select r.user_id, r.track_id, 'improbable_run',
-    jsonb_build_object('n', 30, 'wins', r.wins, 'expected', r.expected, 'z', r.z, 'approximation', 'normal')
+    jsonb_build_object('n', 30, 'sumS', r.wins, 'sumE', r.expected, 'variance', r.variance, 'z', r.z, 'approximation', 'normal')
   from runs r where r.z >= 3.72 and not exists (
     select 1 from public.integrity_flags f where f.user_id = r.user_id
       and f.track_id = r.track_id and f.kind = 'improbable_run'

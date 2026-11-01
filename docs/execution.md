@@ -1619,6 +1619,12 @@ List at least 60 (template, level) pairs from dailyLevels across Judgment, Logic
 
 **Routes:** these require `isAdmin`; otherwise → 403.
 
+All admin mutations also require a UUID `transitionId` and a trimmed `reason`
+of 5–1000 characters. They use the existing transaction/transition helper, so a
+retry records one action. Item anchoring stores `items.anchored_at` plus the
+frozen rating and RD in the audit note. Unrating and retirement mark the audit
+record's `params.replayPending = true` for task 7.2; neither deletes history.
+
 - `GET /admin/model-health?days=30` returns the model's Brier score, log loss, and reliability bins (from `attempts.forecast` against outcomes on rated attempts), plus per-track counts. It also returns drift: the weekly mean rating of learners with more than 100 rated attempts, and the weekly mean residual on anchor items.
 - `GET /admin/items?flagged=1` lists items with n ≥ 50 and |mean(s − E)| > 0.15 over their item rating events, plus counts.
 - `POST /admin/items/:id/retire` with `{ reason }` sets the item to retired and records a moderation action (`note`).
@@ -1641,8 +1647,31 @@ Implement, run, paste output. Commit: "feat(admin): model health, item flags and
 
 **Done when:**
 
-- [ ] The tests pass.
-- [ ] `make-admin` plus a fresh sign-in reaches `/admin`.
+- [x] The tests pass.
+- [x] `make-admin` plus a fresh sign-in reaches `/admin`.
+
+Verification (1 November 2026):
+
+```text
+npm run test:api -- tests/api/admin.test.ts
+Test Files  1 passed (1)
+Tests  11 passed (11)
+
+npm run test:e2e -- tests/e2e/admin.spec.ts --config /private/tmp/eleanor-playwright-admin.config.ts
+2 passed (5.6s)
+
+npm run check && npm test
+Test Files  13 passed (13)
+Tests  98 passed (98)
+```
+
+The API tests exercise the router against local Postgres with rolled-back
+fixtures, including diagnostic grants, drift, privacy, and idempotent moderation.
+The browser tests run `make-admin`, obtain a fresh real Supabase session, check
+keyboard moderation and axe accessibility, and deny a non-admin session. Their
+diagnostic and moderation HTTP responses are mocked. The temporary Playwright
+config uses port 5177 to avoid other agents' dev servers; the committed test also
+runs with the normal Playwright config.
 
 ### Task 7.2: Integrity flags and deterministic replay
 
@@ -1657,12 +1686,13 @@ Implement, run, paste output. Commit: "feat(admin): model health, item flags and
 **Replay (`npm run model:replay -- [--apply]`):**
 
 - It reads every attempt with `rated = true` whose item is not retired, ordered by `(resolved_at, id)`.
-- It starts every learner and concept from the model's start values, and every item from `initialRating` with rd 250. Anchors are re-frozen at their current values once replay passes the timestamp at which they were anchored.
+- It starts every learner and concept from the model's start values, and every item from `initialRating` with rd 250. Anchors are re-frozen at `items.anchored_at`, using the matching admin audit note's frozen rating and RD. Legacy anchors without an audit note use their current stored values.
 - It recomputes with `applyResponse` into in-memory maps and prints:
   - learners whose track rating changes by more than 25;
   - the 20 largest item changes;
   - the overall mean shift.
 - With `--apply`, inside one transaction it rewrites `track_ratings`, `concept_ratings`, item ratings, and `rating_events` (deletes, then reinserts, with a `model_version` suffix `+replay-<date>`), then refreshes the leaderboard.
+- A successful apply sets `params.replayPending = false` on pending unrate and retirement audit records in that same transaction. Dry runs and failed applies preserve pending markers and the rest of each audit record.
 - Without `--apply` it is read-only.
 - It refuses `--apply` against production unless `--confirm-production` is passed. 🔒 The owner runs that.
 
@@ -1678,9 +1708,9 @@ Implement, run, paste output. Commit: "feat(integrity): review flags and determi
 
 **Done when:**
 
-- [x] The determinism test passes (replay equals live within 1e-9; `npm run test:replay`, 10 tests passed).
+- [x] The determinism test passes (replay equals live within 1e-9; `npm run test:replay`, 11 tests passed, including audited anchors and pending replay completion).
 
-Verification: `npm run test:api -- tests/api/integrity.test.ts` and `npm run check && npm test`. Production `--apply --confirm-production` remains an owner gate.
+Verification: `npm run test:api -- tests/api/integrity.test.ts tests/api/admin.test.ts` and `npm run check && npm test`. Production `--apply --confirm-production` remains an owner gate.
 
 ---
 

@@ -87,6 +87,11 @@ function TopBar() {
                   Settings
                 </NavLink>
               </li>
+              {session.user.app_metadata.role === 'admin' && <li>
+                <NavLink to="/admin" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                  Admin
+                </NavLink>
+              </li>}
             </ul>
           </nav>
         )}
