@@ -31,6 +31,10 @@ import {
   handleCodeSubmit,
   handleGetCodeSubmission,
 } from './routes/code.ts'
+import {
+  handleModelHealth, handleAdminItems, handleModerateItem, handleAdminFlags,
+  handleResolveFlag, handleAdminReports, handleModerateUser,
+} from './routes/admin.ts'
 
 export type Ctx = {
   userId: string
@@ -69,6 +73,14 @@ function createRoute(method: string, pattern: string, handler: RouteHandler): Ro
 }
 
 const routes: RouteEntry[] = [
+  createRoute('GET', '/admin/model-health', handleModelHealth),
+  createRoute('GET', '/admin/items', handleAdminItems),
+  createRoute('POST', '/admin/items/:id/retire', handleModerateItem),
+  createRoute('POST', '/admin/items/:id/anchor', handleModerateItem),
+  createRoute('GET', '/admin/flags', handleAdminFlags),
+  createRoute('POST', '/admin/flags/:id/resolve', handleResolveFlag),
+  createRoute('GET', '/admin/reports', handleAdminReports),
+  createRoute('POST', '/admin/users/:id/action', handleModerateUser),
   createRoute('POST', '/onboarding', handleOnboarding),
   createRoute('GET', '/me', handleGetMe),
   createRoute('POST', '/handle', handleUpdateHandle),
@@ -97,6 +109,10 @@ export async function route(req: Request, ctx: Omit<Ctx, 'params'>): Promise<Res
     pathname = pathname.slice('/functions/v1/api'.length) || '/'
   } else if (pathname.startsWith('/api')) {
     pathname = pathname.slice('/api'.length) || '/'
+  }
+
+  if ((pathname === '/admin' || pathname.startsWith('/admin/')) && !ctx.isAdmin) {
+    return fail('forbidden', 'Admin access required')
   }
 
   for (const r of routes) {
