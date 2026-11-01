@@ -1678,7 +1678,9 @@ Implement, run, paste output. Commit: "feat(integrity): review flags and determi
 
 **Done when:**
 
-- [ ] The determinism test passes (replay equals live).
+- [x] The determinism test passes (replay equals live within 1e-9; `npm run test:replay`, 10 tests passed).
+
+Verification: `npm run test:api -- tests/api/integrity.test.ts` and `npm run check && npm test`. Production `--apply --confirm-production` remains an owner gate.
 
 ---
 

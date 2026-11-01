@@ -71,7 +71,7 @@ export async function resolveAttempt(
     `
 
     const [itemRow] = await tx`
-      select rating, rd, anchor, n
+      select rating, rd, anchor, anchored_at, n
       from items
       where id = ${attempt.item_id}
       for update
@@ -79,6 +79,21 @@ export async function resolveAttempt(
     if (!itemRow) {
       throw new HttpError('internal', 'Item not found')
     }
+
+    // Locked rating dependencies must resolve in an unambiguous replay order.
+    const [previous] = await tx`
+      select greatest(
+        (select created_at from rating_events
+         where user_id = ${a.userId} and subject_type = 'track' and subject_id = ${attempt.track_id}
+         order by created_at desc limit 1),
+        (select created_at from rating_events
+         where subject_type = 'item' and subject_id = ${attempt.item_id}
+         order by created_at desc limit 1)
+      ) as last_at
+    `
+    const previousAt = previous.last_at ? new Date(previous.last_at).getTime() : -Infinity
+    const anchorAt = itemRow.anchor && itemRow.anchored_at ? new Date(itemRow.anchored_at).getTime() : -Infinity
+    a.now = new Date(Math.max(a.now.getTime(), previousAt + 1, anchorAt + 1))
 
     const trackRating: Rating = {
       r: Number(trackRow.rating),
@@ -355,6 +370,7 @@ export async function resolveAttempt(
   await tx`
     update attempts
     set state = 'resolved',
+        rated = ${rated_effective},
         outcome = ${a.outcome},
         answer = ${a.answer !== null ? JSON.stringify(a.answer) : null}::jsonb,
         confidence = ${a.confidence},
