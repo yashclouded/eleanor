@@ -2,6 +2,7 @@ import type postgres from 'npm:postgres@3.4.5'
 import { sql } from '../db.ts'
 import { ok, body, HttpError, isUuid } from '../http.ts'
 import { withTransition } from '../transition.ts'
+import { rateLimit } from '../rate-limit.ts'
 import { loadSelectionInput, type SetDbRow } from '../load.ts'
 import { selectSlot, unlocked, priority, type ConceptState } from '../../_shared/select.ts'
 import { hashSeed, makeRng } from '../../_shared/rng.ts'
@@ -228,7 +229,7 @@ export async function computeSetSummary(
     select a.slot, a.concept_id, a.outcome, a.item_rating, a.rating_delta, a.misconception_id, a.kind, c.name as concept_name
     from attempts a
     join concepts c on a.concept_id = c.id
-    where a.set_id = ${set.id}
+    where a.set_id = ${set.id} and a.user_id = ${userId}
     order by a.slot asc
   `
 
@@ -316,6 +317,10 @@ export async function handleCreateSet(ctx: Ctx): Promise<Response> {
       tx,
       { id: b.transitionId, userId: ctx.userId, kind: 'create_set' },
       async () => {
+        const [profile] = await tx`
+          select set_size from profiles where id = ${ctx.userId} for update
+        `
+        if (!profile) throw new HttpError('not_found', 'Profile not found')
         // If an open rated set exists for this track, return it (resume)
         if (b.mode === 'rated') {
           const openSets = await tx`
@@ -330,9 +335,7 @@ export async function handleCreateSet(ctx: Ctx): Promise<Response> {
           }
         }
 
-        const [profile] = await tx`
-          select set_size from profiles where id = ${ctx.userId}
-        `
+        await rateLimit(tx, ctx.userId, 'set_create', 30, '1 hour')
         const size = profile?.set_size ? Number(profile.set_size) : 5
         const setId = crypto.randomUUID()
         const rngSeed = hashSeed(setId)
@@ -374,7 +377,7 @@ export async function handleNextProblem(ctx: Ctx): Promise<Response> {
 
   return await sql.begin(async (tx) => {
     const [set] = await tx`
-      select * from sets where id = ${setId} for update
+      select * from sets where id = ${setId} and user_id = ${ctx.userId} for update
     `
     if (!set || set.user_id !== ctx.userId) {
       throw new HttpError('not_found', 'Set not found')
@@ -391,7 +394,7 @@ export async function handleNextProblem(ctx: Ctx): Promise<Response> {
       from attempts a
       join instances i on a.instance_id = i.id
       join concepts c on a.concept_id = c.id
-      where a.set_id = ${setId}
+      where a.set_id = ${setId} and a.user_id = ${ctx.userId}
       order by a.slot asc
     `
 
@@ -653,7 +656,7 @@ export async function handleGetAttempt(ctx: Ctx): Promise<Response> {
     from attempts a
     join instances i on a.instance_id = i.id
     join concepts c on a.concept_id = c.id
-    where a.id = ${attemptId}
+    where a.id = ${attemptId} and a.user_id = ${ctx.userId}
   `
 
   if (!attempt || attempt.user_id !== ctx.userId) {

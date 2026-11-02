@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { lazy, useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth.tsx'
 import { api, type AttemptView } from '../lib/api.ts'
@@ -13,10 +13,13 @@ import { RepairLadder, type RepairStepData } from '../components/RepairLadder.ts
 import { Reveal } from '../components/Reveal.tsx'
 import { InsightInput } from '../components/InsightInput.tsx'
 import { SetSummary, type SetSummaryData } from '../components/SetSummary.tsx'
-import { CodeEditor, type RunResult } from '../components/CodeEditor.tsx'
+import type { RunResult } from '../components/CodeEditor.tsx'
+import { LoadPanel } from '../components/LoadPanel.tsx'
 import { CodeVerdict } from '../components/CodeVerdict.tsx'
 import { useOutcomeSound } from '../lib/useOutcomeSound.ts'
 import { prepareSound } from '../lib/feedback.ts'
+
+const CodeEditor = lazy(() => import('../components/CodeEditor.tsx').then((module) => ({ default: module.CodeEditor })))
 
 export function SetPlayer() {
   const { setId } = useParams<{ setId: string }>()
@@ -496,7 +499,7 @@ export function SetPlayer() {
       {isCodeProblem ? (
         <>
           {/* Code Editor component handles problem statement, input/output formats, constraints, samples, and code editing */}
-          <CodeEditor
+          <LoadPanel label="code editor"><CodeEditor
             attemptId={attempt.id}
             statementBlocks={
               attempt.answerSpec.type === 'code' && attempt.answerSpec.statement
@@ -521,7 +524,7 @@ export function SetPlayer() {
             onLanguageChange={setCodeLanguage}
             onRun={handleRunCode}
             disabled={isJudging}
-          />
+          /></LoadPanel>
 
           {/* Compilation error verdict shown in presented state */}
           {isPresented && (codeCompileError || (codeVerdictInfo && codeVerdictInfo.verdict === 'compile_error')) && (

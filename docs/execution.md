@@ -1737,10 +1737,10 @@ Paste the full CI-equivalent local run. Commit: "test: end-to-end journey, acces
 You are implementing Task 8.2 of the Eleanor MVP: a security and performance review. Do not add features.
 Check and fix (with a test for each fix):
 1. RLS: run supabase db lint and the Supabase security advisor (CLI or dashboard; follow current docs) and fix every warning. Re-run test:db.
-2. The api accepts only APP_ORIGIN for CORS; every body is size-capped (64 KB code, 8 KB otherwise); every id is validated as a uuid; every route checks user ownership in SQL.
+2. The api accepts only APP_ORIGIN for CORS; every JSON body is byte-capped (64 KiB code, 8 KiB otherwise; oversized requests return 413); resource and transition IDs are validated as UUIDs, except registry item IDs, which use versioned content keys; every route checks user ownership in SQL.
 3. Rate limits: sets created ≤ 30/hour, commits ≤ 300/hour, code runs (already done), reports (done), all via rate_events; return 429.
 4. There are no secrets in the client bundle: grep dist/ for 'sb_secret', 'service_role' and the Judge0 host and token.
-5. Static host headers: CSP default-src 'self'; connect-src 'self' https://<project>.supabase.co; img-src 'self' data:; style-src 'self' 'unsafe-inline' (only if CodeMirror requires it; check); frame-ancestors 'none'. Also Referrer-Policy no-referrer and Permissions-Policy with every permission denied. Write them for the chosen host (vercel.json, _headers or similar) with an SPA fallback rewrite.
+5. Static host headers: CSP default-src 'self'; connect-src 'self' plus the configured Supabase origin; img-src 'self' data:; style-src 'self' 'unsafe-inline' (required by existing React inline styles and CodeMirror's generated styles); frame-ancestors 'none'. Also Referrer-Policy no-referrer and Permissions-Policy denying unused browser capabilities, with clipboard-write=(self) and web-share=(self) to preserve explicit Daily sharing and code-copy actions. Generate Netlify-compatible _headers and _redirects from the build configuration, with an SPA fallback rewrite. No inline scripts or eval are permitted.
 6. Performance: a 300-attempt user loads Progress in < 1.5 s locally; EXPLAIN the selection-input queries and add missing indexes; the bundle gzip size is < 250 KB for the main chunk (lazy-load CodeMirror and Admin).
 7. Run npm audit --omit=dev and resolve high/critical issues.
 Report findings with evidence. Commit: "chore(security): hardening pass".
@@ -1748,8 +1748,8 @@ Report findings with evidence. Commit: "chore(security): hardening pass".
 
 **Done when:**
 
-- [ ] Every item above has evidence pasted.
-- [ ] No high or critical findings remain.
+- [x] Every item above has evidence pasted in [docs/security-review.md](security-review.md).
+- [x] No high or critical findings remain.
 
 ### Task 8.3: Closed calibration beta 🔒
 

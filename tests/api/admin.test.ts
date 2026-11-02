@@ -36,7 +36,7 @@ async function fixture(run: (tx: postgres.TransactionSql) => Promise<void>) {
       if (!installed.function && migration) await tx.unsafe(migration)
       adminId = crypto.randomUUID()
       learnerId = crypto.randomUUID()
-      itemId = `admin-test-${crypto.randomUUID()}`
+      itemId = `judgment.admin-test-${crypto.randomUUID()}@1#1`
       for (const id of [adminId, learnerId]) {
         await tx`insert into auth.users (id) values (${id})`
         await tx`
@@ -160,7 +160,8 @@ describe('Task 7.1: admin model health and moderation', () => {
         case when a.id = ${ids[100]}::uuid then 1400 else 1300 end, 100, 0.75, 1, 'erm-1', a.resolved_at
       from attempts a where a.user_id = ${learnerId}
     `
-    await tx`update items set anchor = true, anchored_at = now() - interval '12 hours' where id = ${itemId}`
+    await tx`update items set anchor = true where id = ${itemId}`
+    await tx`update items set anchored_at = now() - interval '12 hours' where id = ${itemId}`
     const health = (await (await request('/model-health')).json()).data
     const [item] = await tx`select track_id from items where id = ${itemId}`
     const [clock] = await tx`select date_trunc('week', now() at time zone 'UTC')::date::text as week`
@@ -185,11 +186,11 @@ describe('Task 7.1: admin model health and moderation', () => {
   }))
 
   it('requires 200 responses before anchoring, records the freeze, and replays retries once', () => fixture(async (tx) => {
-    expect((await request(`/items/${itemId}/anchor`, action())).status).toBe(409)
+    expect((await request(`/items/${encodeURIComponent(itemId)}/anchor`, action())).status).toBe(409)
     await tx`update items set n = 200 where id = ${itemId}`
     const payload = action()
-    expect((await request(`/items/${itemId}/anchor`, payload)).status).toBe(200)
-    expect((await request(`/items/${itemId}/anchor`, payload)).status).toBe(200)
+    expect((await request(`/items/${encodeURIComponent(itemId)}/anchor`, payload)).status).toBe(200)
+    expect((await request(`/items/${encodeURIComponent(itemId)}/anchor`, payload)).status).toBe(200)
     const [item] = await tx`select anchor, anchored_at, rating, rd from items where id = ${itemId}`
     expect(item).toMatchObject({ anchor: true, rating: 1200, rd: 250 })
     expect(item.anchored_at).not.toBeNull()
@@ -200,7 +201,7 @@ describe('Task 7.1: admin model health and moderation', () => {
 
   it('retires an item with an audit note and leaves its attempts intact', () => fixture(async (tx) => {
     const [attemptId] = await attempts(tx, [{ p: 0.5, correct: true }])
-    expect((await request(`/items/${itemId}/retire`, action())).status).toBe(200)
+    expect((await request(`/items/${encodeURIComponent(itemId)}/retire`, action())).status).toBe(200)
     const [item] = await tx`select status from items where id = ${itemId}`
     expect(item.status).toBe('retired')
     expect(await tx`select id from attempts where id = ${attemptId}`).toHaveLength(1)
@@ -214,13 +215,13 @@ describe('Task 7.1: admin model health and moderation', () => {
       values (${learnerId}, 'judgment', 1400, 80, 25, 1400, now())
     `
     const [profile] = await tx`select handle from profiles where id = ${learnerId}`
-    await tx`refresh materialized view leaderboard`
+    await tx`refresh materialized view private.leaderboard`
     expect(await tx`select handle from leaderboard where handle = ${profile.handle}`).not.toHaveLength(0)
     expect((await request(`/users/${learnerId}/action`, action({ action: 'ban' }))).status).toBe(200)
-    await tx`refresh materialized view leaderboard`
+    await tx`refresh materialized view private.leaderboard`
     expect(await tx`select handle from leaderboard where handle = ${profile.handle}`).toHaveLength(0)
     expect((await request(`/users/${learnerId}/action`, action({ action: 'unban' }))).status).toBe(200)
-    await tx`refresh materialized view leaderboard`
+    await tx`refresh materialized view private.leaderboard`
     expect(await tx`select handle from leaderboard where handle = ${profile.handle}`).not.toHaveLength(0)
     expect(await tx`select id from moderation_actions where user_id = ${learnerId}`).toHaveLength(2)
   }))

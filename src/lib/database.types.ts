@@ -632,12 +632,13 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
 "daily_stats":
-{ Args: { "p_day": string }; Returns: Json
-                           } |
 { Args: { "p_day": string,"p_user_id"?: string }; Returns: Json
                            },
 "public_profile":
 { Args: { "p_handle": string }; Returns: Json
+                           },
+"scan_integrity":
+{ Args: Record<PropertyKey, never>; Returns: undefined
                            }
           }
           Enums: {

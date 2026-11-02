@@ -167,8 +167,8 @@ test.describe('Task 4.5: Leaderboards and Public Profiles', () => {
       on conflict (id) do update set text = excluded.text
     `
 
-    // Refresh the materialized view public.leaderboard
-    await testSql`refresh materialized view public.leaderboard`
+    // Refresh the private snapshot behind the public leaderboard view
+    await testSql`refresh materialized view private.leaderboard`
   })
 
   test('signed out: leaderboard shows 3 eligible users in rating order and excludes hidden user', async ({ page }) => {
@@ -212,7 +212,7 @@ test.describe('Task 4.5: Leaderboards and Public Profiles', () => {
       on conflict (user_id, track_id) do update
       set rating = excluded.rating, rd = excluded.rd, n = excluded.n, peak = excluded.peak, last_at = now()
     `
-    await testSql`refresh materialized view public.leaderboard`
+    await testSql`refresh materialized view private.leaderboard`
 
     await loginUser(page, provEmail)
     await page.goto('/leaderboard/logic')

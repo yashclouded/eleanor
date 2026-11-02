@@ -143,7 +143,7 @@ export async function applyReplay(tx: postgres.TransactionSql, replay: ReturnTyp
   for (const i of replay.items) await tx`update public.items set rating = ${i.rating}, rd = ${i.rd}, n = ${i.n} where id = ${i.id}`
   const modelVersion = `${MODEL_VERSION}+replay-${date.toISOString().slice(0, 10)}`
   for (const event of replay.events) await tx`insert into public.rating_events ${tx({ ...event, model_version: modelVersion })}`
-  await tx`refresh materialized view public.leaderboard`
+  await tx`refresh materialized view private.leaderboard`
   await tx`update public.moderation_actions
     set params = jsonb_set(params, '{replayPending}', 'false'::jsonb)
     where params->'replayPending' = 'true'::jsonb

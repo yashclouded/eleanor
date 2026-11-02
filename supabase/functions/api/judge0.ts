@@ -303,12 +303,11 @@ export function setJudge0Client(client: Judge0Client | null): void {
   injectedClient = client
 }
 
-export function getJudge0Client(customUrl?: string): Judge0Client {
+export function getJudge0Client(): Judge0Client {
   if (injectedClient) {
     return injectedClient
   }
   const url =
-    customUrl ||
     Deno.env.get('JUDGE0_URL') ||
     'https://ce.judge0.com'
   const authHeader = Deno.env.get('JUDGE0_AUTH_HEADER') || undefined

@@ -9,6 +9,7 @@ export default defineConfig({
     ],
   },
   test: {
+    globalSetup: ['tests/api/setup.ts'],
     include: ['tests/api/**/*.test.ts'],
     testTimeout: 30000,
     hookTimeout: 30000,

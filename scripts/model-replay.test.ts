@@ -123,6 +123,8 @@ describe.runIf(process.env.REPLAY_DB_TESTS === '1')('replay against live API res
     await sql.unsafe(await readFile(new URL('../supabase/seed.sql', import.meta.url), 'utf8'))
     const functions = await readFile(new URL('../supabase/migrations/0003_functions_cron.sql', import.meta.url), 'utf8')
     await sql.unsafe(functions.split('-- 3. Materialized View: public.leaderboard')[1].split('-- 4. Function')[0])
+    const security = await readFile(new URL('../supabase/migrations/0007_security.sql', import.meta.url), 'utf8')
+    await sql.unsafe(security.split('select cron.alter_job')[0])
     await sql.unsafe(await readFile(new URL('../supabase/migrations/0005_model_health.sql', import.meta.url), 'utf8'))
     // pg_cron lives only in the parent database; integrity.test.ts verifies the actual schedule.
     const migration = await readFile(new URL('../supabase/migrations/0006_integrity.sql', import.meta.url), 'utf8')

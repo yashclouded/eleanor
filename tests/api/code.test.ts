@@ -1,6 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import http from 'node:http'
-import { call, createTestUser, testSql } from './helpers.ts'
+import { adminClient, createTestUser, testSql } from './helpers.ts'
+import { localCall as call } from './local.ts'
+
+vi.mock('../../supabase/functions/api/db.ts', async () => ({ sql: (await import('./helpers.ts')).testSql }))
 
 describe('API: Judge0-backed code judging (Task 5.2)', () => {
   let server: http.Server
@@ -143,14 +146,22 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
       server.listen(0, '0.0.0.0', () => {
         const addr = server.address()
         if (typeof addr === 'object' && addr !== null) {
-          fakeJudgeUrl = `http://host.docker.internal:${addr.port}`
+          fakeJudgeUrl = `http://127.0.0.1:${addr.port}`
         }
         resolve()
       })
     })
+    const judgePath = '../../supabase/functions/api/judge0.ts'
+    const judge = await import(judgePath)
+    judge.setJudge0Client(judge.createJudge0Client({ url: fakeJudgeUrl }))
+    vi.stubGlobal('Deno', { env: { get: (name: string) => process.env[name] } })
   })
 
   afterAll(async () => {
+    const judgePath = '../../supabase/functions/api/judge0.ts'
+    const judge = await import(judgePath)
+    judge.setJudge0Client(null)
+    vi.unstubAllGlobals()
     if (server) {
       server.close()
     }
@@ -228,7 +239,7 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
     expect(res.data.error.message).toMatch(/\/code\/submit/i)
   })
 
-  it('source over 64 KB → 400', async () => {
+  it('code request over 64 KiB → 413', async () => {
     const user = await onboardCodeUser('large_src')
     const { attempt } = await createCodeAttempt(user)
     const hugeSource = 'a'.repeat(65537)
@@ -243,11 +254,10 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
         input: '',
       },
       user.token,
-      'POST',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'POST'
     )
-    expect(runRes.status).toBe(400)
-    expect(runRes.data.error.code).toBe('invalid')
+    expect(runRes.status).toBe(413)
+    expect(runRes.data.error.code).toBe('payload_too_large')
 
     // Submit with oversized source
     const submitRes = await call(
@@ -260,11 +270,10 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
         confidence: 0.8,
       },
       user.token,
-      'POST',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'POST'
     )
-    expect(submitRes.status).toBe(400)
-    expect(submitRes.data.error.code).toBe('invalid')
+    expect(submitRes.status).toBe(413)
+    expect(submitRes.data.error.code).toBe('payload_too_large')
   })
 
   it('the 21st run within 10 minutes → 429', async () => {
@@ -284,8 +293,7 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
         input: '',
       },
       user.token,
-      'POST',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'POST'
     )
     expect(runRes.status).toBe(200)
     expect(runRes.data.data.status.id).toBe(3)
@@ -305,11 +313,42 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
         input: '',
       },
       user.token,
-      'POST',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'POST'
     )
     expect(limitedRes.status).toBe(429)
     expect(limitedRes.data.error.code).toBe('rate_limited')
+  })
+
+  it('serializes a shared transition before any duplicate Judge0 batch is sent', async () => {
+    const user = await onboardCodeUser('race_sub')
+    try {
+      const attempts = await Promise.all([createCodeAttempt(user), createCodeAttempt(user)])
+      const transitionId = crypto.randomUUID(), before = tokenSeq
+      const results = await Promise.all(attempts.map(({ attempt }) => call('/code/submit', {
+        transitionId, attemptId: attempt.id, language: 'python', source: 'print(1)', confidence: 0.8,
+      }, user.token)))
+      expect(results.map((response) => response.status).sort()).toEqual([200, 409])
+      const [groupCount] = await testSql`select count(*)::int as n from code_tests where item_id = ${attempts[0].attempt.item_id}`
+      expect(tokenSeq - before).toBe(groupCount.n)
+    } finally { await adminClient.auth.admin.deleteUser(user.user.id) }
+  })
+
+  it('shares the commit quota with code submissions and charges concurrent retries once', async () => {
+    const user = await onboardCodeUser('quota_sub')
+    try {
+      const { attempt } = await createCodeAttempt(user)
+      const payload = { transitionId: crypto.randomUUID(), attemptId: attempt.id, language: 'python', source: 'print(1)', confidence: 0.8 }
+      await testSql`insert into rate_events (user_id, kind) select ${user.user.id}, 'commit' from generate_series(1, 300)`
+      const before = tokenSeq
+      expect((await call('/code/submit', payload, user.token)).status).toBe(429)
+      expect(tokenSeq).toBe(before)
+      await testSql`update rate_events set created_at = now() - interval '61 minutes' where user_id = ${user.user.id}`
+      const results = await Promise.all([1, 2].map(() => call('/code/submit', payload, user.token)))
+      expect(results.map((response) => response.status)).toEqual([200, 200])
+      expect(results[0].data).toEqual(results[1].data)
+      const [count] = await testSql`select count(*)::int as n from rate_events where user_id = ${user.user.id} and created_at >= now() - interval '1 hour'`
+      expect(count.n).toBe(1)
+    } finally { await adminClient.auth.admin.deleteUser(user.user.id) }
   })
 
   it('an accepted submission → resolved correct, rated, rating_events present', async () => {
@@ -342,8 +381,7 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
         confidence: 0.9,
       },
       user.token,
-      'POST',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'POST'
     )
     expect(submitRes.status).toBe(200)
     const submissionId = submitRes.data.data.submissionId
@@ -354,8 +392,7 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
       `/code/submissions/${submissionId}`,
       undefined,
       user.token,
-      'GET',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'GET'
     )
     expect(getRes.status).toBe(200)
     expect(getRes.data.data.status).toBe('done')
@@ -409,8 +446,7 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
         confidence: 0.75,
       },
       user.token,
-      'POST',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'POST'
     )
     expect(submitRes.status).toBe(200)
     const submissionId = submitRes.data.data.submissionId
@@ -419,8 +455,7 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
       `/code/submissions/${submissionId}`,
       undefined,
       user.token,
-      'GET',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'GET'
     )
     expect(getRes.status).toBe(200)
     expect(getRes.data.data.status).toBe('done')
@@ -467,8 +502,7 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
         confidence: 0.5,
       },
       user.token,
-      'POST',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'POST'
     )
     expect(submitRes1.status).toBe(200)
     const subId1 = submitRes1.data.data.submissionId
@@ -477,8 +511,7 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
       `/code/submissions/${subId1}`,
       undefined,
       user.token,
-      'GET',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'GET'
     )
     expect(getRes1.status).toBe(200)
     expect(getRes1.data.data.status).toBe('done')
@@ -516,8 +549,7 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
         confidence: 0.85,
       },
       user.token,
-      'POST',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'POST'
     )
     expect(submitRes2.status).toBe(200)
     const subId2 = submitRes2.data.data.submissionId
@@ -531,8 +563,7 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
       `/code/submissions/${subId2}`,
       undefined,
       user.token,
-      'GET',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'GET'
     )
     expect(getRes2.status).toBe(200)
     expect(getRes2.data.data.verdict).toBe('accepted')
@@ -576,8 +607,7 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
         confidence: 0.8,
       },
       user.token,
-      'POST',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'POST'
     )
     expect(submitRes.status).toBe(200)
     const subId = submitRes.data.data.submissionId
@@ -587,8 +617,7 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
       `/code/submissions/${subId}`,
       undefined,
       user.token,
-      'GET',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'GET'
     )
     expect(pollRes.status).toBe(200)
     expect(pollRes.data.data.status).toBe('error')
@@ -621,8 +650,7 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
         confidence: 0.95,
       },
       user.token,
-      'POST',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'POST'
     )
     expect(resubmitRes.status).toBe(200)
     const subId2 = resubmitRes.data.data.submissionId
@@ -631,8 +659,7 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
       `/code/submissions/${subId2}`,
       undefined,
       user.token,
-      'GET',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'GET'
     )
     expect(pollRes2.status).toBe(200)
     expect(pollRes2.data.data.verdict).toBe('accepted')
@@ -668,29 +695,18 @@ describe('API: Judge0-backed code judging (Task 5.2)', () => {
         confidence: 0.8,
       },
       user.token,
-      'POST',
-      { 'x-judge0-url': fakeJudgeUrl }
+      'POST'
     )
     expect(submitRes.status).toBe(200)
     const submissionId = submitRes.data.data.submissionId
 
     // 5 parallel polls
     const results = await Promise.all([
-      call(`/code/submissions/${submissionId}`, undefined, user.token, 'GET', {
-        'x-judge0-url': fakeJudgeUrl,
-      }),
-      call(`/code/submissions/${submissionId}`, undefined, user.token, 'GET', {
-        'x-judge0-url': fakeJudgeUrl,
-      }),
-      call(`/code/submissions/${submissionId}`, undefined, user.token, 'GET', {
-        'x-judge0-url': fakeJudgeUrl,
-      }),
-      call(`/code/submissions/${submissionId}`, undefined, user.token, 'GET', {
-        'x-judge0-url': fakeJudgeUrl,
-      }),
-      call(`/code/submissions/${submissionId}`, undefined, user.token, 'GET', {
-        'x-judge0-url': fakeJudgeUrl,
-      }),
+      call(`/code/submissions/${submissionId}`, undefined, user.token, 'GET'),
+      call(`/code/submissions/${submissionId}`, undefined, user.token, 'GET'),
+      call(`/code/submissions/${submissionId}`, undefined, user.token, 'GET'),
+      call(`/code/submissions/${submissionId}`, undefined, user.token, 'GET'),
+      call(`/code/submissions/${submissionId}`, undefined, user.token, 'GET'),
     ])
 
     for (const res of results) {

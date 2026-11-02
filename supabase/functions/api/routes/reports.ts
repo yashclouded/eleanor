@@ -1,5 +1,6 @@
 import { sql } from '../db.ts'
 import { ok, body, HttpError } from '../http.ts'
+import { rateLimit } from '../rate-limit.ts'
 import type { Ctx } from '../router.ts'
 
 interface CreateReportBody {
@@ -29,22 +30,7 @@ export async function handleCreateReport(ctx: Ctx): Promise<Response> {
   }
 
   return await sql.begin(async (tx) => {
-    // Rate limit: max 5 reports per user per day (past 24h)
-    const [rateCountRow] = await tx`
-      select count(*)::int as count
-      from rate_events
-      where user_id = ${ctx.userId}
-        and kind = 'report'
-        and created_at >= (now() - interval '24 hours')
-    `
-    if (rateCountRow.count >= 5) {
-      throw new HttpError('rate_limited', 'Daily report limit reached (maximum 5 reports per day)')
-    }
-
-    await tx`
-      insert into rate_events (user_id, kind, created_at)
-      values (${ctx.userId}, 'report', now())
-    `
+    await rateLimit(tx, ctx.userId, 'report', 5, '24 hours')
 
     const [newReport] = await tx`
       insert into reports (reporter_id, target_id, reason, created_at)

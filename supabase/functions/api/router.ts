@@ -1,4 +1,4 @@
-import { fail } from './http.ts'
+import { fail, HttpError, isUuid } from './http.ts'
 import {
   handleOnboarding,
   handleGetMe,
@@ -121,7 +121,14 @@ export async function route(req: Request, ctx: Omit<Ctx, 'params'>): Promise<Res
       if (match) {
         const params: Record<string, string> = {}
         for (let i = 0; i < r.paramNames.length; i++) {
-          params[r.paramNames[i]] = decodeURIComponent(match[i + 1])
+          let value: string
+          try { value = decodeURIComponent(match[i + 1]) }
+          catch { throw new HttpError('invalid', 'Invalid path identifier') }
+          const valid = r.pattern.startsWith('/admin/items/')
+            ? /^[a-z]+\.[a-z0-9.-]+@[1-9][0-9]*#[1-9][0-9]*$/.test(value)
+            : isUuid(value)
+          if (!valid) throw new HttpError('invalid', 'Invalid path identifier')
+          params[r.paramNames[i]] = value
         }
         return await r.handler({ ...ctx, params, req })
       }

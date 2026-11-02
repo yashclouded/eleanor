@@ -159,7 +159,7 @@ export async function handleDeleteAccount(ctx: Ctx): Promise<Response> {
   await sql`delete from public.profiles where id = ${ctx.userId}`
 
   // 3. Refresh leaderboard materialized view concurrently
-  await sql`refresh materialized view concurrently public.leaderboard`
+  await sql`refresh materialized view concurrently private.leaderboard`
 
   return ok({ deleted: true })
 }

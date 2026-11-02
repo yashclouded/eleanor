@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { lazy } from 'react'
 import {
   BrowserRouter,
   Routes,
@@ -20,12 +20,14 @@ import { Playbook } from './pages/Playbook.tsx'
 import { Leaderboard } from './pages/Leaderboard.tsx'
 import { Profile } from './pages/Profile.tsx'
 import { Settings } from './pages/Settings.tsx'
-import { Admin } from './pages/Admin.tsx'
+import { LoadPanel } from './components/LoadPanel.tsx'
 import { Terms } from './pages/Terms.tsx'
 import { Privacy } from './pages/Privacy.tsx'
 import { Legal } from './pages/Legal.tsx'
 import { Icon } from './components/Icon.tsx'
 import { SoundToggle } from './components/SoundToggle.tsx'
+
+const Admin = lazy(() => import('./pages/Admin.tsx').then((module) => ({ default: module.Admin })))
 
 function TopBar() {
   const { session, profile, signOut } = useAuth()
@@ -210,7 +212,7 @@ export function AppContent() {
             <Route path="/leaderboard/:track" element={<Leaderboard />} />
             <Route path="/u/:handle" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={<LoadPanel label="admin console"><Admin /></LoadPanel>} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/legal" element={<Legal />} />
