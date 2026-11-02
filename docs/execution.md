@@ -1686,12 +1686,13 @@ runs with the normal Playwright config.
 **Replay (`npm run model:replay -- [--apply]`):**
 
 - It reads every attempt with `rated = true` whose item is not retired, ordered by `(resolved_at, id)`.
-- It starts every learner and concept from the model's start values, and every item from `initialRating` with rd 250. Anchors are re-frozen at their current values once replay passes the timestamp at which they were anchored.
+- It starts every learner and concept from the model's start values, and every item from `initialRating` with rd 250. Anchors are re-frozen at `items.anchored_at`, using the matching admin audit note's frozen rating and RD. Legacy anchors without an audit note use their current stored values.
 - It recomputes with `applyResponse` into in-memory maps and prints:
   - learners whose track rating changes by more than 25;
   - the 20 largest item changes;
   - the overall mean shift.
 - With `--apply`, inside one transaction it rewrites `track_ratings`, `concept_ratings`, item ratings, and `rating_events` (deletes, then reinserts, with a `model_version` suffix `+replay-<date>`), then refreshes the leaderboard.
+- A successful apply sets `params.replayPending = false` on pending unrate and retirement audit records in that same transaction. Dry runs and failed applies preserve pending markers and the rest of each audit record.
 - Without `--apply` it is read-only.
 - It refuses `--apply` against production unless `--confirm-production` is passed. 🔒 The owner runs that.
 
@@ -1707,7 +1708,9 @@ Implement, run, paste output. Commit: "feat(integrity): review flags and determi
 
 **Done when:**
 
-- [ ] The determinism test passes (replay equals live).
+- [x] The determinism test passes (replay equals live within 1e-9; `npm run test:replay`, 11 tests passed, including audited anchors and pending replay completion).
+
+Verification: `npm run test:api -- tests/api/integrity.test.ts tests/api/admin.test.ts` and `npm run check && npm test`. Production `--apply --confirm-production` remains an owner gate.
 
 ---
 
