@@ -267,10 +267,10 @@ test.describe('Task 5.3: Code UI E2E', () => {
     })
 
     await new Promise<void>((resolve) => {
-      fakeJudgeServer.listen(0, '127.0.0.1', () => {
+      fakeJudgeServer.listen(0, '0.0.0.0', () => {
         const addr = fakeJudgeServer.address()
         if (typeof addr === 'object' && addr !== null) {
-          fakeJudgeUrl = `http://127.0.0.1:${addr.port}`
+          fakeJudgeUrl = `http://host.docker.internal:${addr.port}`
         }
         resolve()
       })

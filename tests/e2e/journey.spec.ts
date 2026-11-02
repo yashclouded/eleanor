@@ -77,6 +77,7 @@ for (const scenario of [
         await audit(page)
         await noPageOverflow(page)
         await activate(page, page.getByRole('button', { name: 'Reveal solution', exact: true }))
+        await expect(page.getByTestId('reveal-panel')).toBeVisible()
         await noPageOverflow(page)
         await activate(page, page.getByRole('button', { name: 'Next problem', exact: true }))
       }
