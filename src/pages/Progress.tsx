@@ -383,7 +383,7 @@ export function Progress() {
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(min(140px, 100%), 1fr))',
                     gap: 'var(--space-4)',
                     marginBottom: 'var(--space-6)',
                   }}
@@ -439,7 +439,7 @@ export function Progress() {
             aria-labelledby="retention-heading"
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
               gap: 'var(--space-6)',
               marginBottom: 'var(--space-8)',
             }}

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixtures.ts'
 import AxeBuilder from '@axe-core/playwright'
 import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
@@ -17,7 +17,7 @@ const testSql = postgres(
   { prepare: false, max: 2 }
 )
 
-const MAILPIT_URL = 'http://127.0.0.1:54324'
+const MAILPIT_URL = process.env.MAILPIT_URL || 'http://127.0.0.1:54324'
 
 interface MailpitMessageSummary {
   ID: string
@@ -41,7 +41,7 @@ async function getMagicLinkForEmail(email: string, maxAttempts = 20): Promise<st
       const detail = await detailRes.json()
       const body = detail.Text || detail.HTML || ''
 
-      const match = body.match(/http:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify\?[^\s"'<>]+/i)
+      const match = body.match(/https?:\/\/[^\s"'<>]+\/auth\/v1\/verify\?[^\s"'<>]+/i)
       if (match) {
         return match[0].replace(/&amp;/g, '&')
       }
@@ -190,7 +190,7 @@ test.describe('Task 4.2: Set Player E2E', () => {
     // Answer input
     const answerInput = page.locator('#answer-input')
     await answerInput.focus()
-    await page.keyboard.type('99.9')
+    await page.keyboard.type('999999999999999')
 
     // Confidence quick-pick: select 80% with keyboard
     const conf80Btn = page.getByRole('button', { name: '80%' })
@@ -509,7 +509,7 @@ test.describe('Task 4.2: Set Player E2E', () => {
     await checkA11y(page, 'Presented state')
 
     // 2. Resolved state
-    await page.locator('#answer-input').fill('99.9')
+    await page.locator('#answer-input').fill('999999999999999')
     await page.getByRole('button', { name: '80%' }).click()
     await page.getByRole('button', { name: 'Commit' }).click()
     await expect(page.getByTestId('result-panel')).toBeVisible()

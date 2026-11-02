@@ -99,7 +99,7 @@ function TopBar() {
 
       <div className="top-bar-right">
         {session ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-3)' }}>
             {profile && (
               <>
                 <Link

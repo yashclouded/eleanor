@@ -91,7 +91,7 @@ export function Landing() {
         >
           Think first. Commit an answer and how sure you are. Get rated like a chess player. Prove it a week later on a problem you have never seen.
         </blockquote>
-        <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', justifyContent: 'center' }}>
           <Link to="/login" className="btn btn-primary" style={{ padding: 'var(--space-3) var(--space-6)' }}>
             Start Practising
           </Link>
@@ -109,7 +109,7 @@ export function Landing() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))',
             gap: 'var(--space-4)',
           }}
         >
@@ -153,7 +153,7 @@ export function Landing() {
           boxShadow: 'var(--shadow-sm)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
           <span
             style={{
               fontSize: '0.75rem',
@@ -196,7 +196,7 @@ export function Landing() {
               onChange={setConfidence}
             />
 
-            <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-6)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', marginTop: 'var(--space-6)' }}>
               <button
                 type="button"
                 className="btn btn-primary"
@@ -322,6 +322,7 @@ export function Landing() {
       <footer
         style={{
           display: 'flex',
+          flexWrap: 'wrap',
           justifyContent: 'space-between',
           alignItems: 'center',
           fontSize: '0.8125rem',
@@ -333,7 +334,7 @@ export function Landing() {
         <div>
           Eleanor · No AI in the product · Pure deterministic grading
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)' }}>
           <Link to="/terms" style={{ color: 'var(--text-dim)' }}>
             Terms of Service
           </Link>

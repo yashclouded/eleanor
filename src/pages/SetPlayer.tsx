@@ -460,7 +460,7 @@ export function SetPlayer() {
         }}
       >
         <div>
-          <span
+          <h1
             style={{
               fontSize: '0.75rem',
               fontWeight: 700,
@@ -470,7 +470,7 @@ export function SetPlayer() {
             }}
           >
             {attempt.track.toUpperCase()} TRACK · {attempt.concept.name}
-          </span>
+          </h1>
           {attempt.slot !== null && (
             <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: 600 }}>
               Problem {attempt.slot + 1}

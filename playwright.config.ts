@@ -1,4 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
+import { loadEnv } from 'vite'
+
+Object.assign(process.env, loadEnv('test', process.cwd(), ''))
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173'
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -8,8 +12,8 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:5173',
-    trace: 'on-first-retry',
+    baseURL,
+    trace: 'retain-on-failure',
   },
   projects: [
     {
@@ -18,9 +22,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: true,
+    command: `npm run dev -- --port ${new URL(baseURL).port || '5173'}`,
+    url: baseURL,
+    reuseExistingServer: !process.env.CI,
     timeout: 30000,
   },
 })

@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
-    "check": "npm run typecheck && npm run lint && deno check supabase/functions/api/index.ts",
+    "check": "npm run typecheck && npm run lint && deno check --node-modules-dir=none supabase/functions/api/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:api": "vitest run --config vitest.api.config.ts",

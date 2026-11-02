@@ -247,7 +247,7 @@ export function Settings() {
             <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
               Controls the target success rate used by the adaptive item selection model.
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))', gap: 'var(--space-3)' }}>
               <label className={`choice-card ${intensity === 'steady' ? 'is-selected' : ''}`}>
                 <input
                   type="radio"
@@ -300,7 +300,7 @@ export function Settings() {
             <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
               Number of problems per practice set.
             </p>
-            <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
               {[3, 5, 8].map((size) => (
                 <label key={size} className={`choice-card ${setSize === size ? 'is-selected' : ''}`} style={{ flex: 1 }}>
                   <input
@@ -326,7 +326,7 @@ export function Settings() {
             <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
               Decide when rating updates are presented during a set.
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: 'var(--space-3)' }}>
               <label className={`choice-card ${ratingReveal === 'end_of_set' ? 'is-selected' : ''}`}>
                 <input
                   type="radio"
@@ -387,7 +387,7 @@ export function Settings() {
             <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
               Select which thinking arenas appear on your Today dashboard.
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px, 100%), 1fr))', gap: 'var(--space-3)' }}>
               {[
                 { id: 'judgment', name: 'Judgment', desc: 'Probability & decisions' },
                 { id: 'logic', name: 'Logic', desc: 'Deduction & structure' },
@@ -421,7 +421,7 @@ export function Settings() {
             <legend style={{ fontWeight: 600, fontSize: '0.9375rem', marginBottom: 'var(--space-2)', color: 'var(--text)' }}>
               Theme
             </legend>
-            <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
               {(['system', 'light', 'dark'] as const).map((t) => (
                 <label key={t} className={`choice-card ${theme === t ? 'is-selected' : ''}`} style={{ flex: 1 }}>
                   <input
@@ -462,7 +462,7 @@ export function Settings() {
             <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
               Control whether your handle and ratings appear on public leaderboard rankings.
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: 'var(--space-3)' }}>
               <label className={`choice-card ${leaderboardVisible ? 'is-selected' : ''}`}>
                 <input
                   type="radio"
@@ -525,7 +525,7 @@ export function Settings() {
           Your handle is your unique identifier. Handles can be changed at most once every 30 days.
         </p>
         <form onSubmit={handleUpdateHandle} style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <div>
+          <div style={{ minWidth: 0, maxWidth: '100%' }}>
             <label htmlFor="settings-handle" style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: 'var(--space-1)' }}>
               New handle
             </label>

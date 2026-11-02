@@ -160,7 +160,8 @@ describe('Task 7.1: admin model health and moderation', () => {
         case when a.id = ${ids[100]}::uuid then 1400 else 1300 end, 100, 0.75, 1, 'erm-1', a.resolved_at
       from attempts a where a.user_id = ${learnerId}
     `
-    await tx`update items set anchor = true, anchored_at = now() - interval '12 hours' where id = ${itemId}`
+    await tx`update items set anchor = true where id = ${itemId}`
+    await tx`update items set anchored_at = now() - interval '12 hours' where id = ${itemId}`
     const health = (await (await request('/model-health')).json()).data
     const [item] = await tx`select track_id from items where id = ${itemId}`
     const [clock] = await tx`select date_trunc('week', now() at time zone 'UTC')::date::text as week`

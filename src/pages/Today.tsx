@@ -233,6 +233,7 @@ export function Today() {
             <div
               className="weekly-dots"
               data-testid="weekly-dots"
+              role="group"
               aria-label={`Weekly goal: ${distinctActiveDays} of ${weeklyGoal} days completed`}
             >
               {Array.from({ length: Math.max(weeklyGoal, distinctActiveDays) }).map((_, i) => {
@@ -241,6 +242,7 @@ export function Today() {
                   <span
                     key={i}
                     data-testid={isFilled ? 'weekly-dot-filled' : 'weekly-dot'}
+                    role="img"
                     className={`weekly-dot ${isFilled ? 'filled' : 'empty'}`}
                     aria-label={`Day ${i + 1}: ${isFilled ? 'completed' : 'not completed'}`}
                   />
