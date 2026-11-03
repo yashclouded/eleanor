@@ -1756,7 +1756,7 @@ Paste the full CI-equivalent local run. Commit: "test: end-to-end journey, acces
 
 **Done when:**
 
-- [ ] CI is green on a pull request (link it).
+- [x] CI is green on [pull request #1](https://github.com/yashclouded/eleanor/pull/1): [successful run 41465504264](https://github.com/yashclouded/eleanor/actions/runs/41465504264).
 
 ### Task 8.2: Security and performance review
 
