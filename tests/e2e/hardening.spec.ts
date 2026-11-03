@@ -4,8 +4,11 @@ import { readFile } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { adminClient, createTestUser, createUserClient, SUPABASE_URL, testSql } from '../api/helpers.ts'
+import postgres from 'postgres'
+import { adminClient, createTestUser, createUserClient, SUPABASE_URL } from '../api/helpers.ts'
 import { loadSelectionInput } from '../../supabase/functions/api/load.ts'
+
+const testSql = postgres(process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres', { prepare: false, max: 2 })
 
 let server: Server, origin: string, userId: string
 const orphanInstances: string[] = []
