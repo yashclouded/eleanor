@@ -180,7 +180,7 @@ export function Profile() {
           gap: 'var(--space-4)',
         }}
       >
-        <div style={{ display: 'flex', gap: 'var(--space-4)', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', alignItems: 'center' }}>
           <div
             style={{
               width: '64px',
@@ -199,7 +199,7 @@ export function Profile() {
             {profileData.handle.charAt(0).toUpperCase()}
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-2)' }}>
               <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>
                 @{profileData.handle}
               </h1>
@@ -316,7 +316,7 @@ export function Profile() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))',
               gap: 'var(--space-4)',
             }}
           >
@@ -362,7 +362,7 @@ export function Profile() {
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(min(130px, 100%), 1fr))',
                   gap: 'var(--space-4)',
                   marginBottom: 'var(--space-5)',
                 }}

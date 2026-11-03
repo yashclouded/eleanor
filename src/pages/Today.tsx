@@ -252,8 +252,8 @@ export function Today() {
                   <span
                     key={i}
                     data-testid={isFilled ? 'weekly-dot-filled' : 'weekly-dot'}
-                    className={`weekly-dot ${isFilled ? 'filled' : 'empty'}`}
                     role="img"
+                    className={`weekly-dot ${isFilled ? 'filled' : 'empty'}`}
                     aria-label={`Day ${i + 1}: ${isFilled ? 'completed' : 'not completed'}`}
                   />
                 )

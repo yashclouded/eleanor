@@ -14,7 +14,7 @@ export async function startTestApi(appOrigin: string, judge0Url = '') {
 Deno.serve = handler => serve({ hostname: '127.0.0.1', port: 0,
   onListen({port}) { console.log('API_READY=' + port) } }, handler);
 await import(${JSON.stringify(api)});\n`)
-  const child = spawn('deno', ['run', '--allow-env', '--allow-net', '--allow-read', '--node-modules-dir=auto', '--frozen', entry], {
+  const child = spawn('deno', ['run', '--allow-env', '--allow-net', '--allow-read', '--node-modules-dir=none', '--frozen', entry], {
     cwd: root, stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, SUPABASE_URL, SUPABASE_SECRET_KEY, SUPABASE_PUBLISHABLE_KEY,
       SUPABASE_DB_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',

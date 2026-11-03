@@ -105,7 +105,7 @@ export function Admin() {
       <section className="form-card" aria-labelledby="model-health-heading">
         <h2 id="model-health-heading">Model health</h2>
         <p>Rated forecasts over the last 30 days. Lower Brier score and log loss indicate better forecasts.</p>
-        <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 'var(--space-4)' }}>
+        <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(140px, 100%), 1fr))', gap: 'var(--space-4)' }}>
           {[
             ['Brier score', value(health.brier)], ['Log loss', value(health.logLoss)],
             ['Calibration error', value(health.calError)], ['Overconfidence gap', value(health.overconfidence)],

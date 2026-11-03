@@ -294,7 +294,7 @@ describe('API: Repair ladder, reveal and playbook', () => {
     await testSql`
       update echoes
       set due_at = now() - interval '1 hour'
-      where user_id = ${user.user.id} and family_id = ${attempt1.familyId ?? 'base-rate-screening'}
+      where user_id = ${user.user.id} and source_attempt_id = ${attempt1.id}
     `
     await testSql`
       update attempts

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixtures.ts'
 import AxeBuilder from '@axe-core/playwright'
 import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'

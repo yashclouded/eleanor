@@ -61,7 +61,7 @@ export function ConceptMap({ concepts, onSelectConcept }: ConceptMapProps) {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))',
               gap: 'var(--space-4)',
             }}
           >
@@ -104,7 +104,6 @@ export function ConceptMap({ concepts, onSelectConcept }: ConceptMapProps) {
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
-                    opacity: concept.isLocked ? 0.75 : 1,
                   }}
                 >
                   <div>
@@ -183,7 +182,7 @@ export function ConceptMap({ concepts, onSelectConcept }: ConceptMapProps) {
                           background: 'rgba(0,0,0,0.04)',
                           borderRadius: 'var(--radius-sm)',
                           fontSize: '0.8125rem',
-                          color: 'var(--text-dim)',
+                          color: 'var(--text-muted)',
                           lineHeight: 1.4,
                         }}
                       >

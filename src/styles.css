@@ -201,6 +201,7 @@
 }
 
 html, body {
+  overflow-wrap: anywhere;
   min-height: 100vh;
   background-color: var(--bg);
   color: var(--text);
@@ -249,6 +250,8 @@ html, body {
 
 .top-bar {
   display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
   align-items: center;
   justify-content: space-between;
   padding: 18px clamp(20px, 3.5vw, 56px);
@@ -261,6 +264,8 @@ html, body {
 
 .top-bar-left {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
   align-items: center;
   gap: var(--space-6);
 }
@@ -280,6 +285,7 @@ html, body {
 
 .nav-links {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 3px;
   list-style: none;
@@ -310,6 +316,7 @@ html, body {
 
 .top-bar-right {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: var(--space-3);
 }
@@ -317,6 +324,7 @@ html, body {
 .main-content {
   color: var(--text);
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   padding: 40px clamp(20px, 3.5vw, 56px);
@@ -334,6 +342,15 @@ html, body {
   max-width: var(--col-dashboard);
   margin: 0 auto;
 }
+
+@media (max-width: 640px) {
+  .top-bar, .main-content { padding: var(--space-3); }
+  .top-bar-left { gap: var(--space-3); }
+  .nav-links { gap: var(--space-1); }
+  .form-card, .card { min-width: 0; overflow-wrap: anywhere; }
+}
+
+fieldset, input, select, textarea { min-width: 0; max-width: 100%; }
 
 /* Common form controls */
 .form-card {
@@ -570,7 +587,7 @@ html, body {
 /* Today Dashboard & Daily Crux additions (Task 4.3) */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1.3fr 1fr;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
   gap: var(--space-4);
   margin-bottom: var(--space-6);
 }
@@ -718,7 +735,7 @@ html, body {
 
 .crowd-stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   gap: var(--space-3);
   margin: var(--space-4) 0;
 }
@@ -778,7 +795,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .icon { flex-shrink: 0; vertical-align: middle; }
 .brand-mark { display: grid; place-items: center; width: 43px; height: 43px; border: 1px solid var(--border); border-radius: 50%; color: var(--accent); }
 .brand-descriptor { display: block; margin-top: 7px; font-family: var(--font-sans); font-size: 8px; font-weight: 600; letter-spacing: 0.2em; color: var(--text-muted); }
-.account-actions { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.account-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-width: 0; }
 .profile-link { color: var(--text); font-size: 0.8125rem; font-weight: 600; text-decoration: none; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
 .sound-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 44px; min-height: 44px; padding: 8px; background: transparent; border: 1px solid transparent; border-radius: var(--radius-md); color: var(--text-muted); font-size: 0.75rem; cursor: pointer; }
 .sound-toggle:hover, .sound-toggle[aria-pressed='true'] { color: var(--accent); background: var(--accent-soft); }

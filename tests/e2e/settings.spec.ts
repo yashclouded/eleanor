@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixtures.ts'
 import AxeBuilder from '@axe-core/playwright'
 import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
@@ -17,7 +17,7 @@ const testSql = postgres(
   { prepare: false, max: 2 }
 )
 
-const MAILPIT_URL = 'http://127.0.0.1:54324'
+const MAILPIT_URL = process.env.MAILPIT_URL || 'http://127.0.0.1:54324'
 
 async function checkA11y(page: Page, contextName: string) {
   await page.locator('main').evaluate((element) => Promise.all(element.getAnimations({ subtree: true })
@@ -54,7 +54,7 @@ async function getMagicLinkForEmail(email: string, maxAttempts = 20): Promise<st
       const detail = await detailRes.json()
       const body = detail.Text || detail.HTML || ''
 
-      const match = body.match(/http:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify\?[^\s"'<>]+/i)
+      const match = body.match(/https?:\/\/[^\s"'<>]+\/auth\/v1\/verify\?[^\s"'<>]+/i)
       if (match) {
         return match[0].replace(/&amp;/g, '&')
       }
@@ -113,10 +113,9 @@ test.describe('Task 4.6: Settings, Landing, and Legal pages', () => {
   test('landing sample can be solved signed out and makes no network calls to /functions', async ({ page }) => {
     const functionCalls: string[] = []
     page.on('request', (req) => {
-      const url = req.url()
-      // Match the API path so Vite's shared-module imports work on any dev port.
-      if (new URL(url).pathname.startsWith('/functions/v1/')) {
-        functionCalls.push(url)
+      const url = new URL(req.url())
+      if (url.pathname.startsWith('/functions/v1/')) {
+        functionCalls.push(url.href)
       }
     })
 

@@ -167,7 +167,7 @@ export function Landing() {
               onChange={setConfidence}
             />
 
-            <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-6)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', marginTop: 'var(--space-6)' }}>
               <button
                 type="button"
                 className="btn btn-primary"
@@ -295,6 +295,7 @@ export function Landing() {
       <footer className="landing-footer"
         style={{
           display: 'flex',
+          flexWrap: 'wrap',
           justifyContent: 'space-between',
           alignItems: 'center',
           fontSize: '0.8125rem',
@@ -306,7 +307,7 @@ export function Landing() {
         <div>
           Eleanor · No AI in the product
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)' }}>
           <Link to="/terms" style={{ color: 'var(--text-dim)' }}>
             Terms of Service
           </Link>

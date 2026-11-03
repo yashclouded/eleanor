@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures.ts'
 import AxeBuilder from '@axe-core/playwright'
 import type { Session } from '@supabase/supabase-js'
 import { execFile } from 'node:child_process'
