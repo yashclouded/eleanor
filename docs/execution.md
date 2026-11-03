@@ -1565,6 +1565,13 @@ Run the authoring prompt with `<TRACK>` = Logic, for:
 - `invariants.parity-moves`
 - `games.take-away` (the answer is a winning first move, as an `integer`)
 
+Draft implementation verified 31 October 2026: all 12 templates registered;
+`npm run check` passed; `npm test` passed (115 tests); `npm run content:check`
+passed (26 templates, 2 code problems, 34 cards). All 12 `content:preview`
+commands passed; paths are linked in `content/REVIEW.md`. 🔒 Human content
+review and publication remain pending. Set/sequence repair ladders use numeric
+reconstruction checks, matching the existing `Step` interface.
+
 ### Task 6.4: Math templates (12)
 
 Run the authoring prompt with `<TRACK>` = Math, for:
@@ -1582,6 +1589,12 @@ Run the authoring prompt with `<TRACK>` = Math, for:
 - `functions.linear-vs-exponential`
 - `optimization.fence-area` (no calculus required)
 
+Draft implementation verified 31 October 2026: all 12 Math templates registered;
+`npm run check` passed; `npm test` passed (139 tests); `npm run content:check`
+passed (38 templates, 2 code problems, 34 cards). All 12 `content:preview`
+commands passed; preview paths are linked in `content/REVIEW.md`.
+🔒 Human content review and publication remain pending.
+
 ### Task 6.5: Code problems (45)
 
 ```text
@@ -1596,6 +1609,20 @@ You are authoring Eleanor code problems. Read doc.md §7.2 and §8 and the two r
 - groups related problems into families so echoes exist (at least 2 problems per family).
 Run npm run content:code:build and npm run content:check after each problem. Add every problem to content/REVIEW.md as draft.
 ```
+
+Draft implementation verified 31 October 2026: 43 new problems plus the two
+references give 45 drafts, five per coding concept, with an echo partner in
+every family. Each new problem passed its individual build and content check.
+The final `npm run content:code:build` passed all 45 problems: C++ and Python
+references within half the time limits, matching small-case brute force, and
+both wrong solutions failing at their declared groups. The builder now checks
+Python references and uses file-backed stdin with bounded validator execution.
+`npm run check && npm test` passed (145 tests); `npm run content:check` passed
+(38 templates, 45 code problems, 34 cards). Full build output is in
+`build/code65-final.log`; new problem previews are linked in `content/REVIEW.md`.
+Toolchain: Python 3.14.5 and Apple clang 21.0.0 with C++17 through the configured
+Command Line Tools directory. 🔒 Human content review and publication remain
+pending; all reviewer and review-date fields are blank.
 
 ### Task 6.6: Daily Crux list and review sign-off
 

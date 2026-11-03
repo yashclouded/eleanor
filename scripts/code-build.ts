@@ -1,10 +1,21 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
+import type { ExecFileSyncOptionsWithStringEncoding } from 'node:child_process'
 import { performance } from 'node:perf_hooks'
 import { CODE_PROBLEMS } from '../supabase/functions/_shared/registry.ts'
 import { compareOutput } from '../supabase/functions/_shared/code/compare.ts'
 import type { CodeProblem } from '../supabase/functions/_shared/content/code/types.ts'
+
+// File-backed stdin avoids synchronous-pipe stalls with large generated inputs.
+function runWithInputFile(command: string, args: string[], inputFile: string, options: ExecFileSyncOptionsWithStringEncoding): string {
+  const input = fs.openSync(inputFile, 'r')
+  try {
+    return execFileSync(command, args, { ...options, stdio: [input, 'pipe', 'pipe'] })
+  } finally {
+    fs.closeSync(input)
+  }
+}
 
 /**
  * Builds and verifies code problem test suites locally.
@@ -62,14 +73,13 @@ export function buildProblem(problem: CodeProblem): void {
   const validatorScript = path.join(srcDir, 'validator.py')
   for (const group of problem.groups) {
     const inFile = path.join(buildDir, `${group.label}.in`)
-    const inputData = fs.readFileSync(inFile, 'utf-8')
 
     try {
-      execFileSync('python3', [validatorScript], {
+      runWithInputFile('python3', [validatorScript], inFile, {
         cwd: srcDir,
-        input: inputData,
         encoding: 'utf-8',
         env,
+        timeout: 10000,
       })
       console.log(`  ✓ group '${group.label}' validated`)
     } catch (err: unknown) {
@@ -93,11 +103,9 @@ export function buildProblem(problem: CodeProblem): void {
   for (const group of problem.groups) {
     const inFile = path.join(buildDir, `${group.label}.in`)
     const outFile = path.join(buildDir, `${group.label}.out`)
-    const inputData = fs.readFileSync(inFile, 'utf-8')
 
     const start = performance.now()
-    const outData = execFileSync(refBin, [], {
-      input: inputData,
+    const outData = runWithInputFile(refBin, [], inFile, {
       encoding: 'utf-8',
       env,
       maxBuffer: 20 * 1024 * 1024,
@@ -117,6 +125,29 @@ export function buildProblem(problem: CodeProblem): void {
     )
   }
 
+  const pythonSource = problem.referenceSolutions?.python
+  let pythonRef = path.join(srcDir, 'solutions/ref.py')
+  if (!fs.existsSync(pythonRef)) {
+    if (!pythonSource) throw new Error(`Missing Python reference for ${slug}`)
+    pythonRef = path.join(buildDir, 'ref.py')
+    fs.writeFileSync(pythonRef, pythonSource, 'utf-8')
+  }
+  for (const group of problem.groups) {
+    const inputFile = path.join(buildDir, `${group.label}.in`)
+    const expected = fs.readFileSync(path.join(buildDir, `${group.label}.out`), 'utf-8')
+    const start = performance.now()
+    const actual = runWithInputFile('python3', [pythonRef], inputFile, { encoding: 'utf-8', env, timeout: Math.ceil(halfLimitSec * 1000),
+      maxBuffer: 20 * 1024 * 1024,
+    })
+    if (!compareOutput(expected, actual, problem.checker)) {
+      throw new Error(`Python reference disagrees with C++ on '${group.label}'`)
+    }
+    if ((performance.now() - start) / 1000 > halfLimitSec) {
+      throw new Error(`Python reference exceeded half cpuSeconds on '${group.label}'`)
+    }
+    console.log(`  ✓ Python ref passed '${group.label}' within half limit`)
+  }
+
   // 4. Run brute.py on groups labelled small and require identical output
   console.log('4. Checking brute force against ref on small groups...')
   const bruteScript = path.join(srcDir, 'solutions/brute.py')
@@ -125,12 +156,10 @@ export function buildProblem(problem: CodeProblem): void {
       if (group.label.toLowerCase().includes('small')) {
         const inFile = path.join(buildDir, `${group.label}.in`)
         const outFile = path.join(buildDir, `${group.label}.out`)
-        const inputData = fs.readFileSync(inFile, 'utf-8')
-        const expected = fs.readFileSync(outFile, 'utf-8')
+            const expected = fs.readFileSync(outFile, 'utf-8')
 
-        const bruteOut = execFileSync('python3', [bruteScript], {
+        const bruteOut = runWithInputFile('python3', [bruteScript], inFile, {
           cwd: srcDir,
-          input: inputData,
           encoding: 'utf-8',
           env,
           timeout: problem.limits.cpuSeconds * 2000,
@@ -175,15 +204,13 @@ export function buildProblem(problem: CodeProblem): void {
       const group = problem.groups[gIdx]
       const inFile = path.join(buildDir, `${group.label}.in`)
       const expected = path.join(buildDir, `${group.label}.out`)
-      const inputData = fs.readFileSync(inFile, 'utf-8')
-      const expectedData = fs.readFileSync(expected, 'utf-8')
+        const expectedData = fs.readFileSync(expected, 'utf-8')
 
       let actualOut: string | null = null
       let failed = false
 
       try {
-        actualOut = execFileSync(runCmd, runArgs, {
-          input: inputData,
+        actualOut = runWithInputFile(runCmd, runArgs, inFile, {
           encoding: 'utf-8',
           env,
           timeout: Math.floor(problem.limits.cpuSeconds * 1000),
@@ -231,7 +258,12 @@ export function buildAllCode(): void {
 // CLI entry point
 if (process.argv[1]?.endsWith('code-build.ts')) {
   try {
-    buildAllCode()
+    const slug = process.argv[2]
+    if (slug) {
+      const problem = CODE_PROBLEMS.find((p) => p.slug === slug)
+      if (!problem) throw new Error(`Unknown code problem: ${slug}`)
+      buildProblem(problem)
+    } else buildAllCode()
     process.exit(0)
   } catch (err: unknown) {
     console.error('\n❌ Code build failed:', err instanceof Error ? err.message : err)

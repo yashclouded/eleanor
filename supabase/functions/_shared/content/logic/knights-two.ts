@@ -191,12 +191,14 @@ export const knightsTwoTemplate: Template<KnightsTwoParams> = {
     reviewedAt: null,
     notes: 'Reference template for 2 and 3 islander Knights and Knaves puzzles',
   },
+  // +100 over the baseline: simultaneous truth constraints need more than a single implication.
   levels: [
-    { level: 1, initialRating: 1100 },
-    { level: 2, initialRating: 1300 },
-    { level: 3, initialRating: 1500 },
+    { level: 1, initialRating: 900 },
+    { level: 2, initialRating: 1100 },
+    { level: 3, initialRating: 1300 },
   ],
   skins: ['island', 'court'],
+  dailyLevels: [3],
 
   sample(rng: Rng, level: number): KnightsTwoParams {
     const speakers: IslanderId[] = level === 1 ? ['A', 'B'] : ['A', 'B', 'C']
@@ -306,6 +308,11 @@ export const knightsTwoTemplate: Template<KnightsTwoParams> = {
   }),
 
   misconceptions: [
+    {
+      id: 'all-silent-or-speaking-are-liars',
+      value: () => [],
+      feedback: () => 'An all-liar assignment is valid only if every spoken claim is false under that assignment. Check each claim rather than assuming nobody tells the truth.',
+    },
     {
       id: 'took-statement-at-face-value',
       value: (p) => p.statements.map((s) => s.speaker),

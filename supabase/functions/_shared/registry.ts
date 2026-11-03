@@ -14,17 +14,30 @@ import { independenceCompoundEventsTemplate } from './content/judgment/independe
 import { independenceAtLeastOneTemplate } from './content/judgment/independence-at-least-one.ts'
 import { regressionSelectionEffectTemplate } from './content/judgment/regression-selection-effect.ts'
 import { oddsLikelihoodRatioTemplate } from './content/judgment/odds-likelihood-ratio.ts'
+import { chainsTemplate, contrapositiveTemplate, cardSelectionTemplate } from './content/logic/deduction.ts'
+import { lineUpTemplate, scheduleTemplate } from './content/logic/ordering.ts'
+import { arrangementsTemplate, inclusionExclusionTemplate, pigeonholeTemplate } from './content/logic/counting.ts'
+import { parityMovesTemplate, takeAwayTemplate } from './content/logic/invariants-games.ts'
+import { threeStatementsTemplate } from './content/logic/knights-three-statements.ts'
 import { knightsTwoTemplate } from './content/logic/knights-two.ts'
+import { ratesWorkTemplate, unitConversionTemplate } from './content/math/ratios.ts'
+import { successiveTemplate, reversePercentTemplate } from './content/math/percent-change.ts'
+import { wordEquationsTemplate, twoUnknownsTemplate } from './content/math/linear.ts'
+import { similarTrianglesTemplate, pythagorasTemplate } from './content/math/geometry.ts'
+import { sequencesTemplate, gcdLcmTemplate } from './content/math/sequences-divisibility.ts'
+import { linearExponentialTemplate, fenceAreaTemplate } from './content/math/functions-optimization.ts'
 import { JUDGMENT_CARDS } from './content/cards/judgment.ts'
 import { LOGIC_CARDS } from './content/cards/logic.ts'
 import { MATH_CARDS } from './content/cards/math.ts'
 import { CODE_CARDS } from './content/cards/code.ts'
+import { LAUNCH_CODE_PROBLEMS } from './content/code/launch.ts'
 import { rangeSumsProblem } from './content/code/code.prefix.range-sums.ts'
 import { robotWalkProblem } from './content/code/code.implementation.robot-walk.ts'
 
 export const CODE_PROBLEMS: CodeProblem[] = [
   rangeSumsProblem,
   robotWalkProblem,
+  ...LAUNCH_CODE_PROBLEMS,
 ]
 
 /**
@@ -50,6 +63,29 @@ export const TEMPLATES: Template<any>[] = [
   regressionSelectionEffectTemplate,
   oddsLikelihoodRatioTemplate,
   knightsTwoTemplate,
+  chainsTemplate,
+  contrapositiveTemplate,
+  cardSelectionTemplate,
+  threeStatementsTemplate,
+  lineUpTemplate,
+  scheduleTemplate,
+  arrangementsTemplate,
+  inclusionExclusionTemplate,
+  pigeonholeTemplate,
+  parityMovesTemplate,
+  takeAwayTemplate,
+  ratesWorkTemplate,
+  unitConversionTemplate,
+  successiveTemplate,
+  reversePercentTemplate,
+  wordEquationsTemplate,
+  twoUnknownsTemplate,
+  similarTrianglesTemplate,
+  pythagorasTemplate,
+  sequencesTemplate,
+  gcdLcmTemplate,
+  linearExponentialTemplate,
+  fenceAreaTemplate,
 ]
 
 export const CARDS: ConceptCard[] = [
