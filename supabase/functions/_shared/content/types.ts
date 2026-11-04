@@ -19,7 +19,15 @@ export type AnswerSpec =
   | { type: 'choice'; options: Option[] }
   | { type: 'multi'; options: Option[] }
   | { type: 'sequence'; items: Option[] }
-  | { type: 'code'; languages: ('python' | 'cpp' | 'javascript')[] }
+  | {
+      type: 'code'
+      languages: ('python' | 'cpp' | 'javascript')[]
+      statement?: Block[]
+      inputFormat?: Block[]
+      outputFormat?: Block[]
+      constraints?: Block[]
+      samples?: { input: string; output: string; explain?: Block[] }[]
+    }
 
 export type Answer = number | string | string[]
 export type RawAnswer = string | string[]

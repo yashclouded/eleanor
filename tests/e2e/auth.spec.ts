@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixtures.ts'
 import AxeBuilder from '@axe-core/playwright'
 import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
@@ -17,7 +17,7 @@ const testSql = postgres(
   { prepare: false, max: 2 }
 )
 
-const MAILPIT_URL = 'http://127.0.0.1:54324'
+const MAILPIT_URL = process.env.MAILPIT_URL || 'http://127.0.0.1:54324'
 
 async function checkA11y(page: Page, contextName: string) {
   const results = await new AxeBuilder({ page }).analyze()
@@ -53,7 +53,7 @@ async function getMagicLinkForEmail(email: string, maxAttempts = 20): Promise<st
       const body = detail.Text || detail.HTML || ''
 
       // Look for the auth verify url
-      const match = body.match(/http:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify\?[^\s"'<>]+/i)
+      const match = body.match(/https?:\/\/[^\s"'<>]+\/auth\/v1\/verify\?[^\s"'<>]+/i)
       if (match) {
         return match[0].replace(/&amp;/g, '&')
       }
@@ -128,7 +128,7 @@ test.describe('Task 4.1: Shell, Auth and Onboarding E2E', () => {
     await expect(page.getByTestId('handle-format-error')).toBeVisible()
 
     // Clear and enter valid handle
-    await page.keyboard.press('Meta+A')
+    await page.keyboard.press('ControlOrMeta+A')
     await page.keyboard.press('Backspace')
     await page.keyboard.type(handle)
     await expect(page.getByTestId('handle-format-error')).not.toBeVisible()

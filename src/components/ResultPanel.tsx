@@ -1,4 +1,5 @@
 import type { AttemptView } from '../lib/api.ts'
+import { Icon } from './Icon.tsx'
 
 interface ResultPanelProps {
   result: NonNullable<AttemptView['result']>
@@ -46,17 +47,17 @@ export function ResultPanel({ result, ratingReveal = 'end_of_set' }: ResultPanel
         >
           {isCorrect && (
             <>
-              <span aria-hidden="true">✓</span> Correct
+              <Icon name="check" size={24} /> Correct
             </>
           )}
           {!isCorrect && !isGaveUp && (
             <>
-              <span aria-hidden="true">✗</span> Incorrect
+              <Icon name="cross" size={24} /> Incorrect
             </>
           )}
           {isGaveUp && (
             <>
-              <span aria-hidden="true">⚐</span> Gave up
+              <Icon name="flag" size={24} /> Gave up
             </>
           )}
         </span>

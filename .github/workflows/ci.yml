@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.7
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.119.0
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run content:check
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
+      - name: Start isolated local services
+        run: |
+          # Mailpit receives all fixture email; this does not configure hosted Auth.
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const path = 'supabase/config.toml'
+          fs.writeFileSync(path, fs.readFileSync(path, 'utf8').replace('email_sent = 2', 'email_sent = 1000'))
+          NODE
+          supabase start -x studio,imgproxy,postgres-meta,realtime,storage-api,logflare,vector,supavisor
+          npm run db:reset
+      - run: npm run test:db
+      - name: Configure local test credentials
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          import { execFileSync } from 'node:child_process'
+          const status = JSON.parse(execFileSync('supabase', ['status', '-o', 'json'], { encoding: 'utf8' }))
+          const env = {
+            VITE_SUPABASE_URL: status.API_URL,
+            VITE_SUPABASE_PUBLISHABLE_KEY: status.PUBLISHABLE_KEY || status.ANON_KEY,
+            SUPABASE_SECRET_KEY: status.SECRET_KEY || status.SERVICE_ROLE_KEY,
+            SUPABASE_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY,
+            DATABASE_URL: status.DB_URL,
+            MAILPIT_URL: status.MAILPIT_URL || status.INBUCKET_URL,
+            PLAYWRIGHT_BASE_URL: 'http://localhost:5173',
+          }
+          for (const [key, value] of Object.entries(env)) if (!value) throw new Error(`Missing local ${key}`)
+          const lines = Object.entries(env).map(([key, value]) => `${key}=${value}`).join('\n') + '\n'
+          fs.writeFileSync('.env.local', lines)
+          fs.appendFileSync(process.env.GITHUB_ENV, lines)
+          fs.writeFileSync('supabase/.env.local', 'APP_ORIGIN=http://localhost:5173\nELEANOR_TEST_CLOCK=1\nJUDGE0_URL=http://127.0.0.1:2358\n')
+          NODE
+      - run: npm run content:code:build
+      - run: npm run content:sync -- --include-drafts
+      - name: Serve API and await readiness
+        run: |
+          npm run functions:serve > /tmp/eleanor-functions.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            status=$(curl --silent --output /dev/null --write-out '%{http_code}' "$VITE_SUPABASE_URL/functions/v1/api/me")
+            if [ "$status" = 401 ]; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/eleanor-functions.log
+          exit 1
+      - run: npm run test:api
+      - run: npm run test:replay
+      - run: npm run content:sync -- --include-drafts
+      - run: npm run test:e2e
+      - run: npm run build
+      - name: Upload browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7
+      - name: Function logs on failure
+        if: failure()
+        run: cat /tmp/eleanor-functions.log || true
+      - name: Stop local services
+        if: always()
+        run: npm run db:stop

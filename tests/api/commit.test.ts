@@ -10,7 +10,7 @@ describe('API: Commit and give-up (the rated transaction)', () => {
   async function onboardUser(prefix: string) {
     const user = await createTestUser(prefix)
     const cleanPrefix = prefix.slice(0, 8).toLowerCase().replace(/[^a-z0-9]/g, '')
-    const id = `${seq++}_${(Date.now() % 10000).toString(36)}`
+    const id = `${seq++}_${crypto.randomUUID().slice(0, 6)}`
     const handle = `u_${cleanPrefix}_${id}`.slice(0, 20)
     const res = await call(
       '/onboarding',
@@ -308,7 +308,7 @@ describe('API: Commit and give-up (the rated transaction)', () => {
 
     const [sec] = await testSql`select misconceptions from instance_secrets where instance_id = (select instance_id from attempts where id = ${attempt.id})`
     const mList = typeof sec.misconceptions === 'string' ? JSON.parse(sec.misconceptions) : sec.misconceptions
-    const misc = (mList as Array<{ id: string; value: unknown }>).find((m) => m.id === 'base-rate-neglect')
+    const misc = (mList as Array<{ id: string; value: unknown }>)[0]
     expect(misc).toBeDefined()
 
     const res = await call(
@@ -327,10 +327,10 @@ describe('API: Commit and give-up (the rated transaction)', () => {
     const result = res.data.data
     expect(result.outcome).toBe('incorrect')
     expect(result.misconception).toBeDefined()
-    expect(result.misconception?.id).toBe('base-rate-neglect')
+    expect(result.misconception?.id).toBe(misc.id)
 
     // Check misconception_stats
-    const [ms] = await testSql`select weight from misconception_stats where misconception_id = 'base-rate-neglect' and user_id = (select user_id from attempts where id = ${attempt.id})`
+    const [ms] = await testSql`select weight from misconception_stats where misconception_id = ${misc.id} and user_id = (select user_id from attempts where id = ${attempt.id})`
     expect(Number(ms.weight)).toBe(1)
   })
 

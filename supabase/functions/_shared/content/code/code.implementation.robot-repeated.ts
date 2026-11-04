@@ -1,0 +1,97 @@
+import type { CodeProblem } from './types.ts'
+
+export const problem: CodeProblem = {
+  "id": "code.implementation.robot-repeated",
+  "slug": "code.implementation.robot-repeated",
+  "version": 1,
+  "concept": "code.implementation",
+  "family": "robot-walk",
+  "status": "draft",
+  "review": {
+    "author": "GPT-6",
+    "reviewer": null,
+    "reviewedAt": null
+  },
+  "initialRating": 2000,
+  "statement": [
+    {
+      "t": "p",
+      "text": "A robot repeats an encoded route k times: 0 forward, 1 left, 2 right; it starts north at the origin."
+    },
+    {
+      "t": "p",
+      "text": "Output its final Manhattan distance. Do not reset its orientation or position between repeats."
+    }
+  ],
+  "inputFormat": [
+    {
+      "t": "p",
+      "text": "The first integer is t (1 to 100). Each case contains n and k, then exactly n integers a[0] through a[n-1]. 1 <= k <= 1000000000; a[i] is 0, 1 or 2."
+    }
+  ],
+  "outputFormat": [
+    {
+      "t": "p",
+      "text": "Print one integer per test case, on its own line."
+    }
+  ],
+  "constraints": [
+    {
+      "t": "p",
+      "text": "1 <= n <= 30000; sum of n over all cases <= 30000. 1 <= k <= 1000000000; a[i] is 0, 1 or 2. Use 64-bit arithmetic for totals and answers."
+    }
+  ],
+  "samples": [
+    {
+      "input": "1\n8 1\n0 2 2 0 1 2 1 0\n",
+      "output": "1\n",
+      "explain": [
+        {
+          "t": "p",
+          "text": "Applying the stated rule to this case gives 1. See the editorial for the method."
+        }
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "label": "small",
+      "fingerprint": "small exhaustive cases: boundary assumptions and incorrect shortcut methods"
+    },
+    {
+      "label": "minimal",
+      "fingerprint": "short random cases, repeated values and disconnected or empty-result cases"
+    },
+    {
+      "label": "performance",
+      "fingerprint": "maximum total input length and large accumulated answers"
+    }
+  ],
+  "limits": {
+    "cpuSeconds": 4,
+    "memoryKb": 256000
+  },
+  "checker": {
+    "kind": "tokens"
+  },
+  "editorial": [
+    {
+      "t": "p",
+      "text": "One route is a translation followed by a quarter-turn rotation. With no net turn multiply the displacement by k. Otherwise four copies cancel, so simulate at most three rotated displacements. O(n) time, O(1) space."
+    }
+  ],
+  "wrong": [
+    {
+      "file": "wrong_boundary.py",
+      "failsGroup": 0
+    },
+    {
+      "file": "wrong_method.py",
+      "failsGroup": 0
+    }
+  ],
+  "referenceSolutions": {
+    "cpp": "#include <iostream>\n#include <vector>\n#include <algorithm>\n#include <numeric>\n#include <map>\n#include <set>\n#include <queue>\n#include <array>\n#include <functional>\n#include <climits>\n#include <utility>\nusing namespace std;\nusing ll=long long;\nll solve(vector<ll> a,ll k){\nll x=0,y=0,d=0;ll dx[]={0,1,0,-1},dy[]={1,0,-1,0};for(ll c:a){if(!c){x+=dx[d];y+=dy[d];}else d=(d+(c==1?3:1))%4;}if(!d)return (abs(x)+abs(y))*k;ll px=0,py=0;for(ll j=0;j<k%4;j++){ll u=x,v=y;for(ll z=0;z<(d*j)%4;z++){ll t=u;u=v;v=-t;}px+=u;py+=v;}return abs(px)+abs(py);\n}\nint main(){ios::sync_with_stdio(false);cin.tie(nullptr);int t;cin>>t;while(t--){ll n,k;cin>>n>>k;vector<ll>a(n);for(ll &x:a)cin>>x;cout<<solve(a,k)<<'\\n';}}\n",
+    "python": "import sys, math, itertools, bisect, collections, functools\n\ndef solve(a,k):\n    x=y=d=0\n    for c in a:\n     if c==0: x+=(0,1,0,-1)[d]; y+=(1,0,-1,0)[d]\n     else: d=(d+(3 if c==1 else 1))%4\n    if d==0: return (abs(x)+abs(y))*k\n    px=py=0\n    for j in range(k%4):\n     u,v=x,y\n     for z in range((d*j)%4): u,v=v,-u\n     px+=u; py+=v\n    return abs(px)+abs(py)\n\ndef main():\n    data=list(map(int,sys.stdin.buffer.read().split())); at=1; out=[]\n    for _ in range(data[0]):\n        n,k=data[at:at+2]; at+=2\n        a=data[at:at+n]; at+=n\n        out.append(str(solve(a,k)))\n    sys.stdout.write('\\n'.join(out)+'\\n')\nif __name__=='__main__': main()\n"
+  }
+}

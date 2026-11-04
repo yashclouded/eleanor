@@ -45,7 +45,7 @@ export async function loadSelectionInput(
   const existingAttempts = await tx`
     select slot, concept_id, kind, outcome, rated, resolved_at
     from attempts
-    where set_id = ${set.id}
+    where set_id = ${set.id} and user_id = ${userId}
     order by slot asc
   `
   const slotIndex = existingAttempts.length

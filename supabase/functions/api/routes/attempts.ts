@@ -1,20 +1,13 @@
 import { sql } from '../db.ts'
-import { ok, body, HttpError } from '../http.ts'
+import { ok, body, HttpError, isUuid } from '../http.ts'
 import { withTransition } from '../transition.ts'
+import { rateLimit } from '../rate-limit.ts'
 import { parseAnswer, isCorrect, matchMisconception, parseNumber } from '../../_shared/grading.ts'
 import type { AnswerSpec, RawAnswer, Block, Tolerance } from '../../_shared/content/types.ts'
 import { toAttemptView, parseJsonIfNeeded } from './sets.ts'
+import { CODE_PROBLEMS } from '../../_shared/registry.ts'
 import { resolveAttempt } from '../resolve.ts'
 import type { Ctx } from '../router.ts'
-
-function isUuid(str: unknown): str is string {
-  return (
-    typeof str === 'string' &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      str
-    )
-  )
-}
 
 interface CommitBody {
   transitionId: string
@@ -26,7 +19,7 @@ interface CommitBody {
 function isCommitBody(x: unknown): x is CommitBody {
   if (!x || typeof x !== 'object') return false
   const b = x as Record<string, unknown>
-  return isUuid(b.transitionId) && 'answer' in b
+  return isUuid(b.transitionId) && 'answer' in b && (b.declaredHelp === undefined || typeof b.declaredHelp === 'boolean')
 }
 
 export async function handleCommitAttempt(ctx: Ctx): Promise<Response> {
@@ -70,7 +63,7 @@ export async function handleCommitAttempt(ctx: Ctx): Promise<Response> {
       select * from transitions where id = ${b.transitionId} for update
     `
     if (existingTransition) {
-      if (existingTransition.user_id !== ctx.userId) {
+      if (existingTransition.user_id !== ctx.userId || existingTransition.kind !== 'commit_attempt' || existingTransition.attempt_id !== attemptId) {
         throw new HttpError('conflict', 'Transition ID already used by another user')
       }
       const response =
@@ -90,6 +83,10 @@ export async function handleCommitAttempt(ctx: Ctx): Promise<Response> {
         ? JSON.parse(attempt.answer_spec)
         : attempt.answer_spec
 
+    if (spec.type === 'code') {
+      throw new HttpError('invalid', 'Code attempts must be submitted via /code/submit')
+    }
+
     const parsed = parseAnswer(spec, b.answer)
     if (!parsed.ok) {
       throw new HttpError('invalid', parsed.error)
@@ -104,6 +101,7 @@ export async function handleCommitAttempt(ctx: Ctx): Promise<Response> {
         attemptId,
       },
       async () => {
+        await rateLimit(tx, ctx.userId, 'commit', 300, '1 hour')
         const secretAnswer =
           typeof attempt.secret_answer === 'string'
             ? JSON.parse(attempt.secret_answer)
@@ -175,7 +173,7 @@ export async function handleGiveUpAttempt(ctx: Ctx): Promise<Response> {
       select * from transitions where id = ${b.transitionId} for update
     `
     if (existingTransition) {
-      if (existingTransition.user_id !== ctx.userId) {
+      if (existingTransition.user_id !== ctx.userId || existingTransition.kind !== 'give_up_attempt' || existingTransition.attempt_id !== attemptId) {
         throw new HttpError('conflict', 'Transition ID already used by another user')
       }
       const response =
@@ -199,6 +197,7 @@ export async function handleGiveUpAttempt(ctx: Ctx): Promise<Response> {
         attemptId,
       },
       async () => {
+        await rateLimit(tx, ctx.userId, 'commit', 300, '1 hour')
         return await resolveAttempt(tx, {
           attemptId,
           userId: ctx.userId,
@@ -260,7 +259,7 @@ export async function handleRepairAttempt(ctx: Ctx): Promise<Response> {
       select * from transitions where id = ${b.transitionId} for update
     `
     if (existingTransition) {
-      if (existingTransition.user_id !== ctx.userId) {
+      if (existingTransition.user_id !== ctx.userId || existingTransition.kind !== 'repair_step' || existingTransition.attempt_id !== attemptId) {
         throw new HttpError('conflict', 'Transition ID already used by another user')
       }
       const response =
@@ -380,7 +379,7 @@ export async function handleRevealAttempt(ctx: Ctx): Promise<Response> {
       select * from transitions where id = ${b.transitionId} for update
     `
     if (existingTransition) {
-      if (existingTransition.user_id !== ctx.userId) {
+      if (existingTransition.user_id !== ctx.userId || existingTransition.kind !== 'reveal_attempt' || existingTransition.attempt_id !== attemptId) {
         throw new HttpError('conflict', 'Transition ID already used by another user')
       }
       const response =
@@ -441,13 +440,57 @@ export async function handleRevealAttempt(ctx: Ctx): Promise<Response> {
           steps: parseJsonIfNeeded(attempt.steps),
         }
 
+        let codeInfo: {
+          verdict?: string | null
+          failedGroupLabel?: string | null
+          failedGroupFingerprint?: string | null
+          compileOutput?: string | null
+          editorial?: Block[]
+          referenceSolutions?: Record<string, string>
+          statement?: Block[]
+          inputFormat?: Block[]
+          outputFormat?: Block[]
+          constraints?: Block[]
+          samples?: { input: string; output: string; explain?: Block[] }[]
+          isRated?: boolean
+        } | undefined
+
+        if (attempt.track_id === 'code') {
+          const [sub] = await tx`
+            select verdict, failed_group, compile_output, rated from code_submissions
+            where attempt_id = ${attempt.id}
+            order by created_at desc
+            limit 1
+          `
+          const problem = CODE_PROBLEMS.find((p) => p.id === attempt.item_id.split('@')[0])
+          const group =
+            sub && sub.failed_group !== null && sub.failed_group !== undefined && problem
+              ? problem.groups[sub.failed_group]
+              : null
+          codeInfo = {
+            verdict: sub?.verdict ?? null,
+            failedGroupLabel: group?.label ?? null,
+            failedGroupFingerprint: group?.fingerprint ?? null,
+            compileOutput: sub?.compile_output ?? null,
+            editorial: problem?.editorial,
+            referenceSolutions: problem?.referenceSolutions,
+            statement: problem?.statement,
+            inputFormat: problem?.inputFormat,
+            outputFormat: problem?.outputFormat,
+            constraints: problem?.constraints,
+            samples: problem?.samples,
+            isRated: sub ? Boolean(sub.rated) : attempt.rated,
+          }
+        }
+
         return toAttemptView(
           attempt,
           attempt,
           { id: attempt.concept_id, name: attempt.concept_name },
           secrets,
           earlierNote,
-          playbookNote
+          playbookNote,
+          codeInfo
         )
       }
     )

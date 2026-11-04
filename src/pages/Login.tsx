@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import { supabase } from '../lib/supabase.ts'
+import { Icon } from '../components/Icon.tsx'
+import { ReasoningArt } from '../components/ReasoningArt.tsx'
 
 export function Login() {
   const [email, setEmail] = useState('')
@@ -57,8 +59,15 @@ export function Login() {
   }
 
   return (
-    <div className="container-problem" style={{ marginTop: 'var(--space-8)' }}>
-      <div className="form-card">
+    <div className="login-layout container-dashboard">
+      <aside className="login-intro">
+        <p className="eyebrow">A MOMENT FOR YOUR MIND</p>
+        <p className="login-statement">A quiet place.<br /><em>A clearer perspective.</em></p>
+        <ReasoningArt />
+        <p className="login-intro-note">Judgment. Logic. Math. Code.<br />Four ways to practise thinking for yourself.</p>
+      </aside>
+      <div className="form-card login-card">
+        <span className="login-symbol"><Icon name={sent ? 'mail' : 'compass'} size={30} /></span>
         {sent ? (
           <div data-testid="check-email-state">
             <h1 style={{ fontSize: '1.5rem', marginBottom: 'var(--space-2)' }}>
@@ -117,7 +126,7 @@ export function Login() {
                 className="btn btn-primary btn-full"
                 disabled={loading || !email}
               >
-                {loading ? 'Sending link...' : 'Send magic link'}
+                {loading ? 'Sending link...' : 'Send magic link'} <Icon name="arrow" size={18} />
               </button>
             </form>
 
@@ -147,6 +156,7 @@ export function Login() {
             )}
           </div>
         )}
+        <p className="login-footnote"><Icon name="shield" size={15} /> Passwordless sign-in. A space of your own.</p>
       </div>
     </div>
   )

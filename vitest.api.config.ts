@@ -1,5 +1,7 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
+
+Object.assign(process.env, loadEnv('test', process.cwd(), ''))
 
 export default defineConfig({
   resolve: {
@@ -9,6 +11,7 @@ export default defineConfig({
     ],
   },
   test: {
+    globalSetup: ['tests/api/setup.ts'],
     include: ['tests/api/**/*.test.ts'],
     testTimeout: 30000,
     hookTimeout: 30000,

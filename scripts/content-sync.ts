@@ -1,8 +1,11 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import postgres from 'postgres'
 import { TRACKS, CONCEPTS } from '../supabase/functions/_shared/catalog.ts'
-import { TEMPLATES, CARDS } from '../supabase/functions/_shared/registry.ts'
+import { TEMPLATES, CARDS, CODE_PROBLEMS } from '../supabase/functions/_shared/registry.ts'
 import type { ConceptCard, Template } from '../supabase/functions/_shared/content/types.ts'
+import type { CodeProblem } from '../supabase/functions/_shared/content/code/types.ts'
 
 export type ExistingItemRow = {
   id: string
@@ -55,6 +58,7 @@ export type SyncRegistry = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   templates: Template<any>[]
   cards?: ConceptCard[]
+  codeProblems?: CodeProblem[]
 }
 
 /**
@@ -155,6 +159,47 @@ export function planSync(
     }
   }
 
+  for (const problem of registry.codeProblems ?? []) {
+    const isPublished = problem.status === 'published'
+    const isEligibleDraft = includeDrafts && problem.status === 'draft'
+
+    if (isPublished || isEligibleDraft) {
+      const itemId = `${problem.id}@${problem.version}#1`
+      activeItemIds.add(itemId)
+
+      const existing = existingMap.get(itemId)
+
+      if (!existing) {
+        toInsert.push({
+          id: itemId,
+          kind: 'code',
+          source_id: problem.id,
+          source_version: problem.version,
+          level: 1,
+          track_id: 'code',
+          concept_id: problem.concept,
+          family_id: problem.family,
+          rating: problem.initialRating,
+          rd: 250,
+          n: 0,
+          anchor: false,
+          status: 'published',
+          daily_eligible: false,
+        })
+      } else {
+        const statusNeedsUpdate = existing.status !== 'published'
+        if (statusNeedsUpdate) {
+          toUpdate.push({
+            id: existing.id,
+            track_id: existing.track_id,
+            status: 'published',
+            daily_eligible: existing.daily_eligible,
+          })
+        }
+      }
+    }
+  }
+
   // Find existing items that should be retired
   for (const existing of existingRows) {
     if (!activeItemIds.has(existing.id)) {
@@ -200,15 +245,24 @@ export async function syncContent(options?: {
     `
 
     // 2. Compute plan
-    const plan = planSync({ templates: TEMPLATES, cards: CARDS }, existingRows, {
-      includeDrafts,
-    })
+    const plan = planSync(
+      { templates: TEMPLATES, cards: CARDS, codeProblems: CODE_PROBLEMS },
+      existingRows,
+      {
+        includeDrafts,
+      },
+    )
 
-    // 3. Collect families from active templates
+    // 3. Collect families from active templates and code problems
     const activeFamilies = new Map<string, string>() // family_id -> concept_id
     for (const template of TEMPLATES) {
       if (template.status === 'published' || (includeDrafts && template.status === 'draft')) {
         activeFamilies.set(template.family, template.concept)
+      }
+    }
+    for (const problem of CODE_PROBLEMS) {
+      if (problem.status === 'published' || (includeDrafts && problem.status === 'draft')) {
+        activeFamilies.set(problem.family, problem.concept)
       }
     }
 
@@ -335,6 +389,48 @@ export async function syncContent(options?: {
             updated_at = now()
           where id = ${item.id}
         `
+      }
+
+      // Upsert code tests from build/code-tests/
+      const codeProblemsToSync = CODE_PROBLEMS.filter(
+        (p) => p.status === 'published' || (includeDrafts && p.status === 'draft'),
+      )
+
+      for (const problem of codeProblemsToSync) {
+        const itemId = `${problem.id}@${problem.version}#1`
+        const problemDir = path.resolve(process.cwd(), 'build/code-tests', problem.slug)
+
+        for (let idx = 0; idx < problem.groups.length; idx++) {
+          const group = problem.groups[idx]
+          const inFile = path.join(problemDir, `${group.label}.in`)
+          const outFile = path.join(problemDir, `${group.label}.out`)
+
+          if (!fs.existsSync(inFile) || !fs.existsSync(outFile)) {
+            throw new Error(
+              `Missing test files for ${problem.slug} group '${group.label}'. Run 'npm run content:code:build' first.`,
+            )
+          }
+
+          const input = fs.readFileSync(inFile, 'utf8')
+          const expected = fs.readFileSync(outFile, 'utf8')
+
+          await tx`
+            insert into public.code_tests (item_id, group_idx, label, fingerprint, input, expected)
+            values (
+              ${itemId},
+              ${idx},
+              ${group.label},
+              ${group.fingerprint},
+              ${input},
+              ${expected}
+            )
+            on conflict (item_id, group_idx) do update set
+              label = excluded.label,
+              fingerprint = excluded.fingerprint,
+              input = excluded.input,
+              expected = excluded.expected
+          `
+        }
       }
     })
 

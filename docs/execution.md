@@ -1275,7 +1275,7 @@ Implement, run, paste output. Commit: "feat(web): Today and Daily Crux pages".
 
 **Done when:**
 
-- [ ] The e2e cases pass.
+- [x] The e2e cases pass.
 
 ### Task 4.4: Progress and Playbook
 
@@ -1306,8 +1306,8 @@ Implement, run, paste output. Commit: "feat(web): progress, concept map, calibra
 
 **Done when:**
 
-- [ ] The tests pass.
-- [ ] Brier is never rendered without calibration error, gap, and N (asserted).
+- [x] The tests pass.
+- [x] Brier is never rendered without calibration error, gap, and N (asserted).
 
 ### Task 4.5: Leaderboards and public profiles
 
@@ -1327,7 +1327,7 @@ Implement, run, paste output. Commit: "feat(web): leaderboards and public profil
 
 **Done when:**
 
-- [ ] The e2e cases pass signed out and signed in.
+- [x] The e2e cases pass signed out and signed in.
 
 ### Task 4.6: Settings, landing, and legal pages
 
@@ -1355,7 +1355,7 @@ Implement, run, paste output. Commit: "feat(web): settings, landing and legal dr
 
 **Done when:**
 
-- [ ] The e2e cases pass.
+- [x] The e2e cases pass.
 - [ ] 🔒 The owner reviews the legal drafts before task 8.4.
 
 ---
@@ -1411,8 +1411,8 @@ Commit: "feat(code): problem format, test builder and reference problems".
 
 **Done when:**
 
-- [ ] Both wrong solutions fail exactly where declared. The reference solution passes within half the limit.
-- [ ] `compare` tests pass.
+- [x] Both wrong solutions fail exactly where declared. The reference solution passes within half the limit.
+- [x] `compare` tests pass.
 
 ### Task 5.2: Judge0 integration in the API
 
@@ -1464,8 +1464,8 @@ Commit: "feat(api): Judge0-backed code judging".
 
 **Done when:**
 
-- [ ] The fake-judge suite passes.
-- [ ] The real-host smoke test shows `accepted` for all 3 languages.
+- [x] The fake-judge suite passes.
+- [x] The real-host smoke test shows `accepted` for all 3 languages.
 
 ### Task 5.3: Code UI
 
@@ -1491,7 +1491,7 @@ Implement, run, paste output. Commit: "feat(web): code editor, run, submit and v
 
 **Done when:**
 
-- [ ] The e2e cases pass.
+- [x] The e2e cases pass.
 
 ---
 
@@ -1565,6 +1565,13 @@ Run the authoring prompt with `<TRACK>` = Logic, for:
 - `invariants.parity-moves`
 - `games.take-away` (the answer is a winning first move, as an `integer`)
 
+Draft implementation verified 31 October 2026: all 12 templates registered;
+`npm run check` passed; `npm test` passed (115 tests); `npm run content:check`
+passed (26 templates, 2 code problems, 34 cards). All 12 `content:preview`
+commands passed; paths are linked in `content/REVIEW.md`. 🔒 Human content
+review and publication remain pending. Set/sequence repair ladders use numeric
+reconstruction checks, matching the existing `Step` interface.
+
 ### Task 6.4: Math templates (12)
 
 Run the authoring prompt with `<TRACK>` = Math, for:
@@ -1582,6 +1589,12 @@ Run the authoring prompt with `<TRACK>` = Math, for:
 - `functions.linear-vs-exponential`
 - `optimization.fence-area` (no calculus required)
 
+Draft implementation verified 31 October 2026: all 12 Math templates registered;
+`npm run check` passed; `npm test` passed (139 tests); `npm run content:check`
+passed (38 templates, 2 code problems, 34 cards). All 12 `content:preview`
+commands passed; preview paths are linked in `content/REVIEW.md`.
+🔒 Human content review and publication remain pending.
+
 ### Task 6.5: Code problems (45)
 
 ```text
@@ -1596,6 +1609,20 @@ You are authoring Eleanor code problems. Read doc.md §7.2 and §8 and the two r
 - groups related problems into families so echoes exist (at least 2 problems per family).
 Run npm run content:code:build and npm run content:check after each problem. Add every problem to content/REVIEW.md as draft.
 ```
+
+Draft implementation verified 31 October 2026: 43 new problems plus the two
+references give 45 drafts, five per coding concept, with an echo partner in
+every family. Each new problem passed its individual build and content check.
+The final `npm run content:code:build` passed all 45 problems: C++ and Python
+references within half the time limits, matching small-case brute force, and
+both wrong solutions failing at their declared groups. The builder now checks
+Python references and uses file-backed stdin with bounded validator execution.
+`npm run check && npm test` passed (145 tests); `npm run content:check` passed
+(38 templates, 45 code problems, 34 cards). Full build output is in
+`build/code65-final.log`; new problem previews are linked in `content/REVIEW.md`.
+Toolchain: Python 3.14.5 and Apple clang 21.0.0 with C++17 through the configured
+Command Line Tools directory. 🔒 Human content review and publication remain
+pending; all reviewer and review-date fields are blank.
 
 ### Task 6.6: Daily Crux list and review sign-off
 
@@ -1619,6 +1646,12 @@ List at least 60 (template, level) pairs from dailyLevels across Judgment, Logic
 
 **Routes:** these require `isAdmin`; otherwise → 403.
 
+All admin mutations also require a UUID `transitionId` and a trimmed `reason`
+of 5–1000 characters. They use the existing transaction/transition helper, so a
+retry records one action. Item anchoring stores `items.anchored_at` plus the
+frozen rating and RD in the audit note. Unrating and retirement mark the audit
+record's `params.replayPending = true` for task 7.2; neither deletes history.
+
 - `GET /admin/model-health?days=30` returns the model's Brier score, log loss, and reliability bins (from `attempts.forecast` against outcomes on rated attempts), plus per-track counts. It also returns drift: the weekly mean rating of learners with more than 100 rated attempts, and the weekly mean residual on anchor items.
 - `GET /admin/items?flagged=1` lists items with n ≥ 50 and |mean(s − E)| > 0.15 over their item rating events, plus counts.
 - `POST /admin/items/:id/retire` with `{ reason }` sets the item to retired and records a moderation action (`note`).
@@ -1641,8 +1674,31 @@ Implement, run, paste output. Commit: "feat(admin): model health, item flags and
 
 **Done when:**
 
-- [ ] The tests pass.
-- [ ] `make-admin` plus a fresh sign-in reaches `/admin`.
+- [x] The tests pass.
+- [x] `make-admin` plus a fresh sign-in reaches `/admin`.
+
+Verification (1 November 2026):
+
+```text
+npm run test:api -- tests/api/admin.test.ts
+Test Files  1 passed (1)
+Tests  11 passed (11)
+
+npm run test:e2e -- tests/e2e/admin.spec.ts --config /private/tmp/eleanor-playwright-admin.config.ts
+2 passed (5.6s)
+
+npm run check && npm test
+Test Files  13 passed (13)
+Tests  98 passed (98)
+```
+
+The API tests exercise the router against local Postgres with rolled-back
+fixtures, including diagnostic grants, drift, privacy, and idempotent moderation.
+The browser tests run `make-admin`, obtain a fresh real Supabase session, check
+keyboard moderation and axe accessibility, and deny a non-admin session. Their
+diagnostic and moderation HTTP responses are mocked. The temporary Playwright
+config uses port 5177 to avoid other agents' dev servers; the committed test also
+runs with the normal Playwright config.
 
 ### Task 7.2: Integrity flags and deterministic replay
 
@@ -1657,12 +1713,13 @@ Implement, run, paste output. Commit: "feat(admin): model health, item flags and
 **Replay (`npm run model:replay -- [--apply]`):**
 
 - It reads every attempt with `rated = true` whose item is not retired, ordered by `(resolved_at, id)`.
-- It starts every learner and concept from the model's start values, and every item from `initialRating` with rd 250. Anchors are re-frozen at their current values once replay passes the timestamp at which they were anchored.
+- It starts every learner and concept from the model's start values, and every item from `initialRating` with rd 250. Anchors are re-frozen at `items.anchored_at`, using the matching admin audit note's frozen rating and RD. Legacy anchors without an audit note use their current stored values.
 - It recomputes with `applyResponse` into in-memory maps and prints:
   - learners whose track rating changes by more than 25;
   - the 20 largest item changes;
   - the overall mean shift.
 - With `--apply`, inside one transaction it rewrites `track_ratings`, `concept_ratings`, item ratings, and `rating_events` (deletes, then reinserts, with a `model_version` suffix `+replay-<date>`), then refreshes the leaderboard.
+- A successful apply sets `params.replayPending = false` on pending unrate and retirement audit records in that same transaction. Dry runs and failed applies preserve pending markers and the rest of each audit record.
 - Without `--apply` it is read-only.
 - It refuses `--apply` against production unless `--confirm-production` is passed. 🔒 The owner runs that.
 
@@ -1678,7 +1735,9 @@ Implement, run, paste output. Commit: "feat(integrity): review flags and determi
 
 **Done when:**
 
-- [ ] The determinism test passes (replay equals live).
+- [x] The determinism test passes (replay equals live within 1e-9; `npm run test:replay`, 11 tests passed, including audited anchors and pending replay completion).
+
+Verification: `npm run test:api -- tests/api/integrity.test.ts tests/api/admin.test.ts` and `npm run check && npm test`. Production `--apply --confirm-production` remains an owner gate.
 
 ---
 
@@ -1697,7 +1756,7 @@ Paste the full CI-equivalent local run. Commit: "test: end-to-end journey, acces
 
 **Done when:**
 
-- [ ] CI is green on a pull request (link it).
+- [x] CI is green on [pull request #1](https://github.com/yashclouded/eleanor/pull/1): [successful run 41465504264](https://github.com/yashclouded/eleanor/actions/runs/41465504264).
 
 ### Task 8.2: Security and performance review
 
@@ -1705,10 +1764,10 @@ Paste the full CI-equivalent local run. Commit: "test: end-to-end journey, acces
 You are implementing Task 8.2 of the Eleanor MVP: a security and performance review. Do not add features.
 Check and fix (with a test for each fix):
 1. RLS: run supabase db lint and the Supabase security advisor (CLI or dashboard; follow current docs) and fix every warning. Re-run test:db.
-2. The api accepts only APP_ORIGIN for CORS; every body is size-capped (64 KB code, 8 KB otherwise); every id is validated as a uuid; every route checks user ownership in SQL.
+2. The api accepts only APP_ORIGIN for CORS; every JSON body is byte-capped (64 KiB code, 8 KiB otherwise; oversized requests return 413); resource and transition IDs are validated as UUIDs, except registry item IDs, which use versioned content keys; every route checks user ownership in SQL.
 3. Rate limits: sets created ≤ 30/hour, commits ≤ 300/hour, code runs (already done), reports (done), all via rate_events; return 429.
 4. There are no secrets in the client bundle: grep dist/ for 'sb_secret', 'service_role' and the Judge0 host and token.
-5. Static host headers: CSP default-src 'self'; connect-src 'self' https://<project>.supabase.co; img-src 'self' data:; style-src 'self' 'unsafe-inline' (only if CodeMirror requires it; check); frame-ancestors 'none'. Also Referrer-Policy no-referrer and Permissions-Policy with every permission denied. Write them for the chosen host (vercel.json, _headers or similar) with an SPA fallback rewrite.
+5. Static host headers: CSP default-src 'self'; connect-src 'self' plus the configured Supabase origin; img-src 'self' data:; style-src 'self' 'unsafe-inline' (required by existing React inline styles and CodeMirror's generated styles); frame-ancestors 'none'. Also Referrer-Policy no-referrer and Permissions-Policy denying unused browser capabilities, with clipboard-write=(self) and web-share=(self) to preserve explicit Daily sharing and code-copy actions. Generate Netlify-compatible _headers and _redirects from the build configuration, with an SPA fallback rewrite. No inline scripts or eval are permitted.
 6. Performance: a 300-attempt user loads Progress in < 1.5 s locally; EXPLAIN the selection-input queries and add missing indexes; the bundle gzip size is < 250 KB for the main chunk (lazy-load CodeMirror and Admin).
 7. Run npm audit --omit=dev and resolve high/critical issues.
 Report findings with evidence. Commit: "chore(security): hardening pass".
@@ -1716,8 +1775,8 @@ Report findings with evidence. Commit: "chore(security): hardening pass".
 
 **Done when:**
 
-- [ ] Every item above has evidence pasted.
-- [ ] No high or critical findings remain.
+- [x] Every item above has evidence pasted in [docs/security-review.md](security-review.md).
+- [x] No high or critical findings remain.
 
 ### Task 8.3: Closed calibration beta 🔒
 

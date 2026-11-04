@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { lazy } from 'react'
 import {
   BrowserRouter,
   Routes,
@@ -9,7 +9,6 @@ import {
   useLocation,
 } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth.tsx'
-import { TitleBadge } from './components/TitleBadge.tsx'
 import { Landing } from './pages/Landing.tsx'
 import { Login } from './pages/Login.tsx'
 import { Onboarding } from './pages/Onboarding.tsx'
@@ -19,11 +18,16 @@ import { Daily } from './pages/Daily.tsx'
 import { Progress } from './pages/Progress.tsx'
 import { Playbook } from './pages/Playbook.tsx'
 import { Leaderboard } from './pages/Leaderboard.tsx'
-import { PublicProfile } from './pages/PublicProfile.tsx'
+import { Profile } from './pages/Profile.tsx'
 import { Settings } from './pages/Settings.tsx'
-import { Admin } from './pages/Admin.tsx'
+import { LoadPanel } from './components/LoadPanel.tsx'
 import { Terms } from './pages/Terms.tsx'
 import { Privacy } from './pages/Privacy.tsx'
+import { Legal } from './pages/Legal.tsx'
+import { Icon } from './components/Icon.tsx'
+import { SoundToggle } from './components/SoundToggle.tsx'
+
+const Admin = lazy(() => import('./pages/Admin.tsx').then((module) => ({ default: module.Admin })))
 
 function TopBar() {
   const { session, profile, signOut } = useAuth()
@@ -40,7 +44,8 @@ function TopBar() {
           className="logo-text"
           aria-label="Eleanor Home"
         >
-          Eleanor
+          <span className="brand-mark"><Icon name="compass" size={28} /></span>
+          <span>Eleanor<span className="brand-descriptor">THE THINKING GYM</span></span>
         </Link>
 
         {session && profile && !isOnboarding && (
@@ -51,7 +56,7 @@ function TopBar() {
                   to="/today"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  Today
+                  <Icon name="compass" size={17} /> Today
                 </NavLink>
               </li>
               <li>
@@ -59,7 +64,7 @@ function TopBar() {
                   to="/daily"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  Daily
+                  <Icon name="calendar" size={17} /> Daily
                 </NavLink>
               </li>
               <li>
@@ -67,7 +72,7 @@ function TopBar() {
                   to="/progress"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  Progress
+                  <Icon name="chart" size={17} /> Progress
                 </NavLink>
               </li>
               <li>
@@ -75,40 +80,54 @@ function TopBar() {
                   to="/leaderboard"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  Leaderboard
+                  <Icon name="trophy" size={17} /> Leaderboard
                 </NavLink>
               </li>
+              <li>
+                <NavLink
+                  to="/settings"
+                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                >
+                  <Icon name="settings" size={17} /> Settings
+                </NavLink>
+              </li>
+              {session.user.app_metadata.role === 'admin' && <li>
+                <NavLink to="/admin" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                  <Icon name="shield" size={17} /> Admin
+                </NavLink>
+              </li>}
             </ul>
           </nav>
         )}
       </div>
 
       <div className="top-bar-right">
+        <SoundToggle />
         {session ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <div className="account-actions">
             {profile && (
               <>
                 <Link
                   to={`/u/${profile.handle}`}
-                  style={{ textDecoration: 'none', color: 'var(--text)', fontWeight: 600, fontSize: '0.875rem' }}
+                  className="profile-link"
                 >
                   @{profile.handle}
                 </Link>
-                <TitleBadge title="Novice" />
               </>
             )}
             <button
               type="button"
               className="btn btn-secondary btn-sm"
               onClick={signOut}
+              aria-label="Sign out"
               data-testid="sign-out-btn"
             >
-              Sign out
+              <Icon name="logout" size={17} /><span className="desktop-label">Sign out</span>
             </button>
           </div>
         ) : (
           <Link to="/login" className="btn btn-primary btn-sm">
-            Sign in
+            Sign in <Icon name="arrow" size={16} />
           </Link>
         )}
       </div>
@@ -143,6 +162,7 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
     path === '/' ||
     path === '/terms' ||
     path === '/privacy' ||
+    path === '/legal' ||
     path.startsWith('/u/') ||
     path.startsWith('/leaderboard')
 
@@ -190,11 +210,12 @@ export function AppContent() {
             <Route path="/playbook" element={<Playbook />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/leaderboard/:track" element={<Leaderboard />} />
-            <Route path="/u/:handle" element={<PublicProfile />} />
+            <Route path="/u/:handle" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={<LoadPanel label="admin console"><Admin /></LoadPanel>} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/legal" element={<Legal />} />
             {/* Catch-all fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

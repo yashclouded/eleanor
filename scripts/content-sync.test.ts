@@ -7,6 +7,7 @@ import {
   type SyncRegistry,
 } from './content-sync.ts'
 import type { Template } from '../supabase/functions/_shared/content/types.ts'
+import type { CodeProblem } from '../supabase/functions/_shared/content/code/types.ts'
 
 function createMockTemplate(overrides?: Partial<Template<unknown>>): Template<unknown> {
   return {
@@ -35,6 +36,34 @@ function createMockTemplate(overrides?: Partial<Template<unknown>>): Template<un
     steps: [],
     solution: () => [],
     dailyLevels: [1],
+    ...overrides,
+  }
+}
+
+function createMockCodeProblem(overrides?: Partial<CodeProblem>): CodeProblem {
+  return {
+    id: 'code.test.problem',
+    version: 1,
+    slug: 'code.test.problem',
+    concept: 'code.prefix-sums',
+    family: 'code.test.problem',
+    status: 'published',
+    review: {
+      author: 'Author',
+      reviewer: 'Reviewer',
+      reviewedAt: '2026-01-01',
+    },
+    initialRating: 1200,
+    statement: [{ t: 'p', text: 'Solve this.' }],
+    inputFormat: [{ t: 'p', text: 'Input' }],
+    outputFormat: [{ t: 'p', text: 'Output' }],
+    constraints: [{ t: 'p', text: 'Constraints' }],
+    samples: [{ input: '1\n', output: '1\n' }],
+    groups: [{ label: 'samples', fingerprint: 'samples' }],
+    limits: { cpuSeconds: 1.0, memoryKb: 256 * 1024 },
+    checker: { kind: 'tokens' },
+    editorial: [{ t: 'p', text: 'Editorial' }],
+    wrong: [],
     ...overrides,
   }
 }
@@ -237,6 +266,44 @@ describe('content-sync: planSync', () => {
     const planWithDrafts = planSync(registry, [], { includeDrafts: true })
     expect(planWithDrafts.toInsert).toHaveLength(2)
     expect(planWithDrafts.toInsert.every((i) => i.status === 'published')).toBe(true)
+  })
+
+  it('inserts code problem items with kind=code, level=1, track_id=code, daily_eligible=false', () => {
+    const codeProblem = createMockCodeProblem({ initialRating: 1250 })
+    const registry: SyncRegistry = { templates: [], codeProblems: [codeProblem] }
+
+    const plan = planSync(registry, [])
+
+    expect(plan.toInsert).toHaveLength(1)
+    const item = plan.toInsert[0]
+    expect(item).toEqual({
+      id: 'code.test.problem@1#1',
+      kind: 'code',
+      source_id: 'code.test.problem',
+      source_version: 1,
+      level: 1,
+      track_id: 'code',
+      concept_id: 'code.prefix-sums',
+      family_id: 'code.test.problem',
+      rating: 1250,
+      rd: 250,
+      n: 0,
+      anchor: false,
+      status: 'published',
+      daily_eligible: false,
+    })
+  })
+
+  it('respects includeDrafts flag for code problems', () => {
+    const draftProblem = createMockCodeProblem({ status: 'draft' })
+    const registry: SyncRegistry = { templates: [], codeProblems: [draftProblem] }
+
+    const withoutDrafts = planSync(registry, [], { includeDrafts: false })
+    expect(withoutDrafts.toInsert).toHaveLength(0)
+
+    const withDrafts = planSync(registry, [], { includeDrafts: true })
+    expect(withDrafts.toInsert).toHaveLength(1)
+    expect(withDrafts.toInsert[0].id).toBe('code.test.problem@1#1')
   })
 })
 

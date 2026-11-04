@@ -10,7 +10,7 @@ describe('API: Repair ladder, reveal and playbook', () => {
   async function onboardUser(prefix: string) {
     const user = await createTestUser(prefix)
     const cleanPrefix = prefix.slice(0, 8).toLowerCase().replace(/[^a-z0-9]/g, '')
-    const id = `${seq++}_${(Date.now() % 10000).toString(36)}`
+    const id = `${seq++}_${crypto.randomUUID().slice(0, 6)}`
     const handle = `u_${cleanPrefix}_${id}`.slice(0, 20)
     const res = await call(
       '/onboarding',
@@ -294,7 +294,7 @@ describe('API: Repair ladder, reveal and playbook', () => {
     await testSql`
       update echoes
       set due_at = now() - interval '1 hour'
-      where user_id = ${user.user.id} and family_id = ${attempt1.familyId ?? 'base-rate-screening'}
+      where user_id = ${user.user.id} and source_attempt_id = ${attempt1.id}
     `
     await testSql`
       update attempts

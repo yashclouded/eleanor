@@ -23,13 +23,27 @@ export type AttemptView = {
     repairStep: number
     repairTotal: number
     repair?: { index: number; prompt: Block[]; tolerance: Tolerance } | null
+    verdict?: string | null
+    failedGroupLabel?: string | null
+    failedGroupFingerprint?: string | null
+    compileOutput?: string | null
+    isRated?: boolean
   }
+  lastCodeSubmission?: {
+    verdict: string | null
+    failedGroupLabel?: string | null
+    failedGroupFingerprint?: string | null
+    compileOutput?: string | null
+    isRated?: boolean
+  } | null
   repair?: { index: number; prompt: Block[]; tolerance: Tolerance } | null
   reveal?: {
     solution: Block[]
     answer: Answer
     playbookNote: string | null
     earlierNote: string | null
+    editorial?: Block[]
+    referenceSolutions?: Record<string, string>
   }
 }
 

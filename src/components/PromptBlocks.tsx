@@ -11,7 +11,7 @@ export function PromptBlocks({ blocks, className = '' }: PromptBlocksProps) {
   }
 
   return (
-    <div className={`prompt-blocks ${className}`.trim()}>
+    <div className={`prompt-blocks ${className}`.trim()} data-testid="prompt-blocks">
       {blocks.map((block, idx) => {
         switch (block.t) {
           case 'p':
@@ -44,6 +44,7 @@ export function PromptBlocks({ blocks, className = '' }: PromptBlocksProps) {
             return (
               <pre
                 key={idx}
+                tabIndex={0}
                 className="prompt-code"
                 style={{
                   background: 'var(--surface-hover)',
@@ -81,7 +82,7 @@ export function PromptBlocks({ blocks, className = '' }: PromptBlocksProps) {
 
           case 'table':
             return (
-              <div key={idx} style={{ overflowX: 'auto', marginBottom: 'var(--space-4)' }}>
+              <div key={idx} tabIndex={0} style={{ overflowX: 'auto', marginBottom: 'var(--space-4)' }}>
                 <table
                   className="prompt-table"
                   style={{

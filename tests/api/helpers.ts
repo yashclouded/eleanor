@@ -81,7 +81,7 @@ export async function call<T = any>(
   extraHeaders?: Record<string, string>
 ): Promise<ApiResponse<T>> {
   const cleanPath = path.startsWith('/') ? path : `/${path}`
-  const url = `${SUPABASE_URL}/functions/v1/api${cleanPath}`
+  const url = `${process.env.API_TEST_URL || `${SUPABASE_URL}/functions/v1/api`}${cleanPath}`
 
   const headers: Record<string, string> = {
     apikey: SUPABASE_PUBLISHABLE_KEY,
