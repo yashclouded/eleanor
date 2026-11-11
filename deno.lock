@@ -1807,7 +1807,7 @@
         "npm:globals@15.15.0",
         "npm:postgres@^3.4.9",
         "npm:react-dom@19.0.0",
-        "npm:react-router-dom@6.28.2",
+        "npm:react-router-dom@7.18.4",
         "npm:react@19.0.0",
         "npm:supabase@2.119.0",
         "npm:tsx@4.19.3",

@@ -2,6 +2,7 @@ import type postgres from 'npm:postgres@3.4.5'
 import { sql } from '../db.ts'
 import { ok, body, HttpError, isUuid } from '../http.ts'
 import { withTransition } from '../transition.ts'
+import { consumeRate } from '../rate-limit.ts'
 import { loadSelectionInput, type SetDbRow } from '../load.ts'
 import { selectSlot, unlocked, priority, type ConceptState } from '../../_shared/select.ts'
 import { hashSeed, makeRng } from '../../_shared/rng.ts'
@@ -330,6 +331,7 @@ export async function handleCreateSet(ctx: Ctx): Promise<Response> {
           }
         }
 
+        await consumeRate(tx, ctx.userId, 'set')
         const [profile] = await tx`
           select set_size from profiles where id = ${ctx.userId}
         `
@@ -374,7 +376,7 @@ export async function handleNextProblem(ctx: Ctx): Promise<Response> {
 
   return await sql.begin(async (tx) => {
     const [set] = await tx`
-      select * from sets where id = ${setId} for update
+      select * from sets where id = ${setId} and user_id = ${ctx.userId} for update
     `
     if (!set || set.user_id !== ctx.userId) {
       throw new HttpError('not_found', 'Set not found')
@@ -653,7 +655,7 @@ export async function handleGetAttempt(ctx: Ctx): Promise<Response> {
     from attempts a
     join instances i on a.instance_id = i.id
     join concepts c on a.concept_id = c.id
-    where a.id = ${attemptId}
+    where a.id = ${attemptId} and a.user_id = ${ctx.userId}
   `
 
   if (!attempt || attempt.user_id !== ctx.userId) {

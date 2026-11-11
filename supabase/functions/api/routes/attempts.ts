@@ -1,21 +1,13 @@
 import { sql } from '../db.ts'
-import { ok, body, HttpError } from '../http.ts'
+import { ok, body, HttpError, isUuid } from '../http.ts'
 import { withTransition } from '../transition.ts'
 import { parseAnswer, isCorrect, matchMisconception, parseNumber } from '../../_shared/grading.ts'
 import type { AnswerSpec, RawAnswer, Block, Tolerance } from '../../_shared/content/types.ts'
 import { toAttemptView, parseJsonIfNeeded } from './sets.ts'
 import { CODE_PROBLEMS } from '../../_shared/registry.ts'
 import { resolveAttempt } from '../resolve.ts'
+import { consumeRate } from '../rate-limit.ts'
 import type { Ctx } from '../router.ts'
-
-function isUuid(str: unknown): str is string {
-  return (
-    typeof str === 'string' &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      str
-    )
-  )
-}
 
 interface CommitBody {
   transitionId: string
@@ -71,7 +63,7 @@ export async function handleCommitAttempt(ctx: Ctx): Promise<Response> {
       select * from transitions where id = ${b.transitionId} for update
     `
     if (existingTransition) {
-      if (existingTransition.user_id !== ctx.userId) {
+      if (existingTransition.user_id !== ctx.userId || existingTransition.kind !== 'commit_attempt' || existingTransition.attempt_id !== attemptId) {
         throw new HttpError('conflict', 'Transition ID already used by another user')
       }
       const response =
@@ -109,6 +101,7 @@ export async function handleCommitAttempt(ctx: Ctx): Promise<Response> {
         attemptId,
       },
       async () => {
+        await consumeRate(tx, ctx.userId, 'commit')
         const secretAnswer =
           typeof attempt.secret_answer === 'string'
             ? JSON.parse(attempt.secret_answer)
@@ -180,7 +173,7 @@ export async function handleGiveUpAttempt(ctx: Ctx): Promise<Response> {
       select * from transitions where id = ${b.transitionId} for update
     `
     if (existingTransition) {
-      if (existingTransition.user_id !== ctx.userId) {
+      if (existingTransition.user_id !== ctx.userId || existingTransition.kind !== 'give_up_attempt' || existingTransition.attempt_id !== attemptId) {
         throw new HttpError('conflict', 'Transition ID already used by another user')
       }
       const response =
@@ -204,6 +197,7 @@ export async function handleGiveUpAttempt(ctx: Ctx): Promise<Response> {
         attemptId,
       },
       async () => {
+        await consumeRate(tx, ctx.userId, 'commit')
         return await resolveAttempt(tx, {
           attemptId,
           userId: ctx.userId,
@@ -265,7 +259,7 @@ export async function handleRepairAttempt(ctx: Ctx): Promise<Response> {
       select * from transitions where id = ${b.transitionId} for update
     `
     if (existingTransition) {
-      if (existingTransition.user_id !== ctx.userId) {
+      if (existingTransition.user_id !== ctx.userId || existingTransition.kind !== 'repair_step' || existingTransition.attempt_id !== attemptId) {
         throw new HttpError('conflict', 'Transition ID already used by another user')
       }
       const response =
@@ -385,7 +379,7 @@ export async function handleRevealAttempt(ctx: Ctx): Promise<Response> {
       select * from transitions where id = ${b.transitionId} for update
     `
     if (existingTransition) {
-      if (existingTransition.user_id !== ctx.userId) {
+      if (existingTransition.user_id !== ctx.userId || existingTransition.kind !== 'reveal_attempt' || existingTransition.attempt_id !== attemptId) {
         throw new HttpError('conflict', 'Transition ID already used by another user')
       }
       const response =

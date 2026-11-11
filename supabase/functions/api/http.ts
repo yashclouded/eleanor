@@ -44,10 +44,37 @@ export function fail(code: ErrorCode, message: string): Response {
   )
 }
 
-export async function body<T>(req: Request, validate: (x: unknown) => x is T): Promise<T> {
+export async function body<T>(req: Request, validate: (x: unknown) => x is T, maxBytes = 8192): Promise<T> {
+  const tooLarge = () => new HttpError('invalid', `Request body exceeds ${maxBytes / 1024} KB limit`)
+  if (Number(req.headers.get('content-length')) > maxBytes) throw tooLarge()
+  const reader = req.body?.getReader()
+  const chunks: Uint8Array[] = []
+  let length = 0
+  if (reader) {
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        length += value.byteLength
+        if (length > maxBytes) {
+          await reader.cancel()
+          throw tooLarge()
+        }
+        chunks.push(value)
+      }
+    } finally {
+      reader.releaseLock()
+    }
+  }
+  const bytes = new Uint8Array(length)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
   let parsed: unknown
   try {
-    parsed = await req.json()
+    parsed = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
   } catch {
     throw new HttpError('invalid', 'Malformed JSON body')
   }

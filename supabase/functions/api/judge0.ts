@@ -304,11 +304,19 @@ export function setJudge0Client(client: Judge0Client | null): void {
 }
 
 export function getJudge0Client(customUrl?: string): Judge0Client {
+  if (customUrl) {
+    if (Deno.env.get('ENABLE_TEST_JUDGE0') !== '1') throw new Error('Test judge override is disabled')
+    const fixture = new URL(customUrl)
+    if (fixture.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]', 'host.docker.internal'].includes(fixture.hostname) || fixture.username || fixture.password) {
+      throw new Error('Test judge must be a local HTTP fixture')
+    }
+    // Local fixtures must never receive the configured judge credentials.
+    return createJudge0Client({ url: fixture.origin })
+  }
   if (injectedClient) {
     return injectedClient
   }
   const url =
-    customUrl ||
     Deno.env.get('JUDGE0_URL') ||
     'https://ce.judge0.com'
   const authHeader = Deno.env.get('JUDGE0_AUTH_HEADER') || undefined

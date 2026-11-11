@@ -1,4 +1,4 @@
-import { fail } from './http.ts'
+import { fail, HttpError } from './http.ts'
 import {
   handleOnboarding,
   handleGetMe,
@@ -31,6 +31,10 @@ import {
   handleCodeSubmit,
   handleGetCodeSubmission,
 } from './routes/code.ts'
+import {
+  handleModelHealth, handleAdminItems, handleRetireItem, handleAnchorItem,
+  handleAdminFlags, handleResolveFlag, handleAdminReports, handleUserAction,
+} from './routes/admin.ts'
 
 export type Ctx = {
   userId: string
@@ -69,6 +73,14 @@ function createRoute(method: string, pattern: string, handler: RouteHandler): Ro
 }
 
 const routes: RouteEntry[] = [
+  createRoute('GET', '/admin/model-health', handleModelHealth),
+  createRoute('GET', '/admin/items', handleAdminItems),
+  createRoute('POST', '/admin/items/:id/retire', handleRetireItem),
+  createRoute('POST', '/admin/items/:id/anchor', handleAnchorItem),
+  createRoute('GET', '/admin/flags', handleAdminFlags),
+  createRoute('POST', '/admin/flags/:id/resolve', handleResolveFlag),
+  createRoute('GET', '/admin/reports', handleAdminReports),
+  createRoute('POST', '/admin/users/:id/action', handleUserAction),
   createRoute('POST', '/onboarding', handleOnboarding),
   createRoute('GET', '/me', handleGetMe),
   createRoute('POST', '/handle', handleUpdateHandle),
@@ -105,7 +117,12 @@ export async function route(req: Request, ctx: Omit<Ctx, 'params'>): Promise<Res
       if (match) {
         const params: Record<string, string> = {}
         for (let i = 0; i < r.paramNames.length; i++) {
-          params[r.paramNames[i]] = decodeURIComponent(match[i + 1])
+          try {
+            params[r.paramNames[i]] = decodeURIComponent(match[i + 1])
+          } catch (error) {
+            if (error instanceof URIError) throw new HttpError('invalid', 'Malformed route parameter')
+            throw error
+          }
         }
         return await r.handler({ ...ctx, params, req })
       }

@@ -19,7 +19,7 @@ export async function withTransition<T>(
 
   if (inserted.length === 0) {
     const existing = await tx`
-      select user_id, kind, response
+      select user_id, kind, attempt_id, response
       from transitions
       where id = ${t.id}
     `
@@ -27,7 +27,7 @@ export async function withTransition<T>(
       throw new HttpError('conflict', 'Transition not found')
     }
     const row = existing[0]
-    if (row.user_id !== t.userId || row.kind !== t.kind) {
+    if (row.user_id !== t.userId || row.kind !== t.kind || row.attempt_id !== (t.attemptId ?? null)) {
       throw new HttpError('conflict', 'Transition ID already exists for another user or action')
     }
     const response = typeof row.response === 'string' ? JSON.parse(row.response) : row.response

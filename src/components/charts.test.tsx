@@ -40,6 +40,33 @@ describe('Task 4.4: Hand-built SVG Charts Unit Tests', () => {
   })
 
   describe('ReliabilityChart', () => {
+    it('shows model-only data with model labels and populated table rows', () => {
+      const html = renderToString(<ReliabilityChart learnerBins={[]} modelBins={[
+        { lo: 0.6, hi: 0.8, n: 42, meanP: 0.7, meanY: 0.75 },
+      ]} initialShowTable />)
+      expect(html).toContain('0.6–0.8')
+      expect(html).toContain('n=42')
+      expect(html).toContain('Model Forecast')
+      expect(html).not.toContain('Mean Confidence')
+      expect(html).not.toContain('Learner (n)')
+      expect(html).not.toContain('>You<')
+      expect(html).toContain('across 1 populated model bins')
+    })
+
+    it('aligns learner and model table values by range when different bins are populated', () => {
+      const html = renderToString(<ReliabilityChart learnerBins={[
+        { lo: 0, hi: 0.2, n: 5, meanP: 0.1, meanY: 0.2 },
+      ]} modelBins={[
+        { lo: 0.8, hi: 1, n: 8, meanP: 0.9, meanY: 1 },
+      ]} initialShowTable />)
+      const table = html.slice(html.indexOf('<tbody>'))
+      const rows = table.split('</tr>')
+      expect(rows[0]).toContain('0.0–0.2')
+      expect(rows[0]).not.toContain('n=8')
+      expect(rows[1]).toContain('0.8–1.0')
+      expect(rows[1]).toContain('n=8')
+    })
+
     it('omits empty bins and prints n per non-empty bin', () => {
       const learnerBins = [
         { lo: 0.0, hi: 0.2, n: 5, meanP: 0.15, meanY: 0.2 },

@@ -11,6 +11,7 @@ import {
   type Judge0SubmissionResponse,
 } from '../judge0.ts'
 import { resolveAttempt } from '../resolve.ts'
+import { consumeRate } from '../rate-limit.ts'
 
 interface CodeRunBody {
   attemptId: string
@@ -58,31 +59,13 @@ function isCodeSubmitBody(x: unknown): x is CodeSubmitBody {
  * Executes learner code on custom/sample input via Judge0.
  */
 export async function handleCodeRun(ctx: Ctx): Promise<Response> {
-  const b = await body(ctx.req, isCodeRunBody)
+  const b = await body(ctx.req, isCodeRunBody, 65536)
 
   // Enforce source code limit (<= 64 KB = 65536 bytes)
   const sourceBytes = new TextEncoder().encode(b.source).length
   if (sourceBytes > 65536) {
     throw new HttpError('invalid', 'Source code exceeds 64 KB limit')
   }
-
-  // Rate limiting: at most 20 runs per 10 minutes
-  const [recentRuns] = await sql`
-    select count(*)::int as count
-    from rate_events
-    where user_id = ${ctx.userId}
-      and kind = 'code_run'
-      and created_at > now() - interval '10 minutes'
-  `
-  if (recentRuns.count >= 20) {
-    throw new HttpError('rate_limited', 'Rate limit exceeded: 20 runs per 10 minutes')
-  }
-
-  // Record rate event
-  await sql`
-    insert into rate_events (user_id, kind)
-    values (${ctx.userId}, 'code_run')
-  `
 
   // Verify attempt exists and belongs to user
   const [attempt] = await sql`
@@ -94,6 +77,9 @@ export async function handleCodeRun(ctx: Ctx): Promise<Response> {
   if (!attempt) {
     throw new HttpError('not_found', 'Attempt not found')
   }
+  const spec: AnswerSpec = typeof attempt.answer_spec === 'string' ? JSON.parse(attempt.answer_spec) : attempt.answer_spec
+  if (spec.type !== 'code') throw new HttpError('invalid', 'Not a code attempt')
+  await sql.begin(async (tx) => consumeRate(tx, ctx.userId, 'code_run'))
 
   const problem = CODE_PROBLEMS.find((p) => p.id === attempt.item_id.split('@')[0])
   const cpuSeconds = problem?.limits.cpuSeconds ?? 2.0
@@ -123,7 +109,7 @@ export async function handleCodeRun(ctx: Ctx): Promise<Response> {
  * Idempotent via transitionId.
  */
 export async function handleCodeSubmit(ctx: Ctx): Promise<Response> {
-  const b = await body(ctx.req, isCodeSubmitBody)
+  const b = await body(ctx.req, isCodeSubmitBody, 65536)
 
   // Enforce source code limit (<= 64 KB)
   const sourceBytes = new TextEncoder().encode(b.source).length
@@ -142,7 +128,7 @@ export async function handleCodeSubmit(ctx: Ctx): Promise<Response> {
       select * from transitions where id = ${b.transitionId} for update
     `
     if (existing) {
-      if (existing.user_id !== ctx.userId) {
+      if (existing.user_id !== ctx.userId || existing.kind !== 'code_submit' || existing.attempt_id !== b.attemptId) {
         throw new HttpError('conflict', 'Transition ID already used by another user')
       }
       const response =
@@ -209,6 +195,7 @@ export async function handleCodeSubmit(ctx: Ctx): Promise<Response> {
 
     const customJudge0Url = ctx.req.headers.get('x-judge0-url') ?? undefined
     const client = getJudge0Client(customJudge0Url)
+    await consumeRate(tx, ctx.userId, 'commit')
 
     let batchResults: { token: string }[]
     try {
