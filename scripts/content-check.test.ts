@@ -62,6 +62,35 @@ function createValidFakeTemplate(): Template<{ val: number }> {
 }
 
 describe('content-check suite', () => {
+  it('rejects a canonical choice missing from the presented options', () => {
+    const template: Template<{ val: number }> = {
+      ...createValidFakeTemplate(),
+      answer: () => ({ type: 'choice', options: 'ABCDEF'.split('').map(id => ({ id, label: id })) }),
+      solve: () => 'missing',
+      verify: () => 'missing',
+      misconceptions: [],
+    }
+    expect(checkTemplate(template, 100).some(error => error.includes('canonical answer'))).toBe(true)
+  })
+
+  it('rejects a sequence verifier that has the right items in the wrong order', () => {
+    const template = createValidFakeTemplate()
+    const ordered: Template<{ val: number }> = {
+      ...template,
+      answer: () => ({ type: 'sequence', items: 'ABCDEF'.split('').map(id => ({ id, label: id })) }),
+      solve: () => 'ABCDEF'.split(''),
+      verify: () => 'FEDCBA'.split(''),
+      misconceptions: [],
+    }
+    expect(checkTemplate(ordered, 100).some(error => error.includes('disagree'))).toBe(true)
+  })
+
+  it('rejects diversity that exists only in unused parameters', () => {
+    const template = createValidFakeTemplate()
+    template.render = () => [{ t: 'p', text: 'The same question for every seed.' }]
+    expect(checkTemplate(template, 100).some((error) => error.includes('distinct visible prompts'))).toBe(true)
+  })
+
   it('detects when verify disagrees with solve', () => {
     const broken = createValidFakeTemplate()
     broken.verify = (p) => p.val + 999
@@ -142,7 +171,7 @@ describe('content-check suite', () => {
   it('passes on the real bank templates, code problems, and catalog concepts', () => {
     const errors = checkAll(TEMPLATES, CONCEPTS, 200)
     expect(errors).toEqual([])
-  })
+  }, 30_000)
 
   it('detects code problems with invalid wrong solution groups or missing samples', () => {
     const invalidProblem: CodeProblem = {

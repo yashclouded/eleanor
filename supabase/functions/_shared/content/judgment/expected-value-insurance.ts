@@ -137,19 +137,17 @@ export const expectedValueInsuranceTemplate: Template<ExpectedValueInsurancePara
   dailyLevels: [3, 4],
 
   sample(rng: Rng, level: number): ExpectedValueInsuranceParams {
-    const pLossPercent = rng.pick([2, 3, 4, 5, 6, 7, 8, 9, 10, 12])
-    const lossAmount = rng.pick([
-      4000, 5000, 6000, 7500, 8000, 9000, 10000, 12000, 14000, 15000,
-    ])
-    const deductible = rng.pick([500, 800, 1000, 1200, 1500, 2000])
+    const pLossPercent = rng.int(2, 12)
+    const lossAmount = rng.int(40, 150) * 100
+    const deductible = rng.int(5, 20) * 100
 
     if (level === 1) {
       return { level, pLossPercent, lossAmount, deductible: 0 }
     } else if (level === 2) {
       return { level, pLossPercent, lossAmount, deductible }
     } else if (level === 3) {
-      const pLoss2Percent = rng.pick([1, 2, 3])
-      const loss2Amount = rng.pick([25000, 30000, 40000])
+      const pLoss2Percent = rng.int(1, 3)
+      const loss2Amount = rng.int(250, 400) * 100
       return {
         level,
         pLossPercent,
@@ -159,7 +157,7 @@ export const expectedValueInsuranceTemplate: Template<ExpectedValueInsurancePara
         loss2Amount,
       }
     } else {
-      const premiumLoadingPercent = rng.pick([15, 20, 25, 30])
+      const premiumLoadingPercent = rng.int(15, 30)
       return {
         level,
         pLossPercent,

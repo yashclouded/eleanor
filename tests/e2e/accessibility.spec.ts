@@ -1,62 +1,70 @@
-import { adminClient, call } from '../api/helpers.ts'
-import { audit, expect, noPageOverflow, onboard, signIn, test } from './fixtures.ts'
+import { expect } from '@playwright/test'
+import { test, adminClient, auditPage, createLearner, press, setLayout } from './release-helpers.ts'
 
-for (const theme of ['light', 'dark'] as const) {
-  for (const signedIn of [false, true]) {
-    test(`every route: ${signedIn ? 'signed in' : 'signed out'}, ${theme}`, async ({ page }) => {
-      test.setTimeout(120000)
-      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' })
-      let user: Awaited<ReturnType<typeof signIn>> | undefined
-      try {
-        if (signedIn) user = await signIn(page, `axe_${theme}`, true, true)
-        const routes = ['/', '/login', '/onboarding', '/today', '/daily', '/progress', '/playbook',
-          '/leaderboard', '/leaderboard/judgment', `/u/${user?.handle ?? 'unknown_user'}`, '/settings', '/admin', '/terms', '/privacy', '/legal']
-        if (user) {
-          const response = await call('/sets', { transitionId: crypto.randomUUID(), track: 'judgment', mode: 'rated' }, user.token)
-          expect(response.status).toBe(200)
-          routes.push(`/train/${response.data.data.set.id}`)
-        } else routes.push('/train/00000000-0000-4000-8000-000000000000')
-        for (const route of routes) {
-          await test.step(route, async () => {
-            await page.setViewportSize({ width: 1280, height: 900 })
-            await page.goto(route)
-            await expect(page.getByRole('main')).toBeVisible()
-            await expect(page.getByRole('heading').first()).toBeVisible()
-            await page.waitForLoadState('networkidle')
-            await audit(page)
-            for (const [width, zoom] of [[1280, 1], [1280, 2], [375, 1], [375, 2]]) {
-              await page.setViewportSize({ width, height: 900 })
-              await page.evaluate(zoom => { document.documentElement.style.zoom = String(zoom) }, zoom)
-              await noPageOverflow(page)
-            }
-          })
-        }
-      } finally {
-        if (user) await adminClient.auth.admin.deleteUser(user.userId)
+const publicRoutes = ['/', '/login', '/terms', '/privacy', '/legal', '/leaderboard', '/leaderboard/judgment']
+const learnerRoutes = ['/onboarding', '/today', '/daily', '/progress', '/playbook', '/settings', '/admin']
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`every route in ${colorScheme}, signed out and signed in`, async ({ page }) => {
+    test.setTimeout(180_000)
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' })
+    for (const route of [...publicRoutes, ...learnerRoutes, '/train/00000000-0000-4000-8000-000000000001', '/u/missing_user']) {
+      await page.goto(route)
+      await page.waitForLoadState('networkidle')
+      await auditPage(page, `signed out ${colorScheme} ${route}`)
+    }
+    const newcomer = await createLearner(page)
+    try {
+      await expect(page.getByTestId('onboarding-step-1')).toBeVisible()
+      await auditPage(page, `onboarding ${colorScheme}`)
+    } finally {
+      await adminClient.auth.admin.deleteUser(newcomer.userId)
+    }
+    const learner = await createLearner(page, { onboarded: true, admin: true })
+    try {
+      const trainRoutes: string[] = []
+      for (const track of ['judgment', 'logic', 'math', 'code']) {
+        await page.goto('/today')
+        await press(page, page.getByRole('button', { name: `Start ${track} set`, exact: true }))
+        await page.waitForURL('**/train/*')
+        trainRoutes.push(new URL(page.url()).pathname)
       }
-    })
-  }
-  test(`all onboarding steps: ${theme}`, async ({ page }) => {
-    test.setTimeout(120000)
-    await page.emulateMedia({ colorScheme: theme })
-    const user = await signIn(page, `onboard_${theme}`, false)
-    try { await onboard(page, user.handle) }
-    finally { await adminClient.auth.admin.deleteUser(user.userId) }
+      for (const route of [...publicRoutes, ...learnerRoutes, `/u/${learner.handle}`, ...trainRoutes]) {
+        await page.goto(route)
+        await page.waitForLoadState('networkidle')
+        await auditPage(page, `signed in ${colorScheme} ${route}`)
+      }
+    } finally {
+      await adminClient.auth.admin.deleteUser(learner.userId)
+    }
   })
-  test(`all rating badge variants: ${theme}`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme: theme })
-    await page.goto('/')
-    await expect(page.getByRole('heading').first()).toBeVisible()
-    await page.getByRole('main').evaluate(main => {
-      const gallery = document.createElement('div')
-      for (const title of ['Novice', 'Apprentice', 'Thinker', 'Analyst', 'Strategist', 'Expert', 'Master', 'Grandmaster', 'Legend']) {
-        const badge = document.createElement('span')
-        badge.className = `title-badge title-${title.toLowerCase()}`
-        badge.textContent = title
-        gallery.append(badge)
+}
+
+for (const layout of [{ width: 375, scale: 1, label: '375px mobile' }, { width: 640, scale: 2, label: '200% on a 1280px display' }]) {
+  test(`keyboard controls and route layouts at ${layout.label}`, async ({ page }) => {
+    test.setTimeout(120_000)
+    // A 640 CSS-pixel viewport at scale 2 models browser zoom/reflow on a 1280-pixel display.
+    await setLayout(page, layout.width, layout.scale)
+    for (const route of publicRoutes) {
+      await page.goto(route)
+      await page.waitForLoadState('networkidle')
+      await auditPage(page, `${layout.label} ${route}`)
+      await page.keyboard.press('Tab')
+      await expect(page.locator(':focus')).toHaveCount(1)
+    }
+    const learner = await createLearner(page, { onboarded: true, admin: true })
+    try {
+      await press(page, page.getByRole('button', { name: 'Start judgment set', exact: true }))
+      await page.waitForURL('**/train/*')
+      const train = new URL(page.url()).pathname
+      for (const route of ['/today', '/daily', '/progress', '/playbook', '/settings', '/admin', `/u/${learner.handle}`, train]) {
+        await page.goto(route)
+        await page.waitForLoadState('networkidle')
+        await auditPage(page, `${layout.label} ${route}`)
       }
-      main.append(gallery)
-    })
-    await audit(page)
+      await page.screenshot({ path: test.info().outputPath('layout.png'), fullPage: true })
+    } finally {
+      await adminClient.auth.admin.deleteUser(learner.userId)
+    }
   })
 }

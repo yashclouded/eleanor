@@ -1,4 +1,6 @@
-import { isCorrect } from '../supabase/functions/_shared/grading.ts'
+import { isCorrect, parseAnswer } from '../supabase/functions/_shared/grading.ts'
+import { chartError } from '../supabase/functions/_shared/content/chart.ts'
+import { diagramError } from '../supabase/functions/_shared/content/diagram.ts'
 import { hashSeed, makeRng } from '../supabase/functions/_shared/rng.ts'
 import { CONCEPTS } from '../supabase/functions/_shared/catalog.ts'
 import { TEMPLATES, CODE_PROBLEMS, CARDS } from '../supabase/functions/_shared/registry.ts'
@@ -126,6 +128,7 @@ export function checkTemplate(template: Template<any>, seedCount = 2000): string
   for (const lvl of template.levels) {
     const level = lvl.level
     const paramJsonSet = new Set<string>()
+    const promptJsonSet = new Set<string>()
     let allMisconceptionsDroppedCount = 0
 
     for (let i = 0; i < seedCount; i++) {
@@ -140,6 +143,11 @@ export function checkTemplate(template: Template<any>, seedCount = 2000): string
 
       const answerSpec = template.answer(params)
       const solveAns = template.solve(params)
+      const parsedCanonical = parseAnswer(answerSpec, typeof solveAns === 'number' ? String(solveAns) : solveAns)
+      if (!parsedCanonical.ok) {
+        const message = `Template ${template.id} level ${level}: invalid canonical answer: ${parsedCanonical.error}`
+        if (!errors.includes(message)) errors.push(message)
+      }
 
       // 1. Answer is finite
       if (typeof solveAns === 'number' && !Number.isFinite(solveAns)) {
@@ -168,12 +176,7 @@ export function checkTemplate(template: Template<any>, seedCount = 2000): string
           }
         }
       } else if (Array.isArray(solveAns) && Array.isArray(verifyAns)) {
-        const sSorted = [...solveAns].sort()
-        const vSorted = [...verifyAns].sort()
-        if (
-          sSorted.length !== vSorted.length ||
-          sSorted.some((val, idx) => val !== vSorted[idx])
-        ) {
+        if (!isCorrect(answerSpec, solveAns, verifyAns)) {
           if (!errors.some((e) => e.includes(`Template ${template.id} level ${level}`) && e.includes('disagree'))) {
             errors.push(
               `Template ${template.id} level ${level} seed ${seed}: solve (${JSON.stringify(
@@ -228,6 +231,14 @@ export function checkTemplate(template: Template<any>, seedCount = 2000): string
       // 5. Render blocks are non-empty for every skin
       for (const skin of template.skins) {
         const blocks = template.render(params, skin)
+        if (i < 1000 && skin === template.skins[0]) promptJsonSet.add(JSON.stringify(blocks))
+        for (const block of blocks ?? []) {
+          if (block.t === 'chart' || block.t === 'diagram') {
+            const error = block.t === 'chart' ? chartError(block) : diagramError(block)
+            const message = `Template ${template.id} level ${level} skin '${skin}': ${error}`
+            if (error && !errors.includes(message)) errors.push(message)
+          }
+        }
         if (!blocks || blocks.length === 0) {
           if (!errors.some((e) => e.includes(`Template ${template.id} level ${level}`) && e.includes('render returned empty blocks'))) {
             errors.push(
@@ -249,6 +260,9 @@ export function checkTemplate(template: Template<any>, seedCount = 2000): string
     }
 
     // Check at least 50 distinct parameter JSONs per 1,000 seeds
+    if (promptJsonSet.size < 50) {
+      errors.push(`Template ${template.id} level ${level}: only produced ${promptJsonSet.size} distinct visible prompts (minimum 50 required)`)
+    }
     if (paramJsonSet.size < 50) {
       errors.push(
         `Template ${template.id} level ${level}: only produced ${paramJsonSet.size} distinct parameter JSONs per 1,000 seeds (minimum 50 required)`,
@@ -356,6 +370,12 @@ export function countBlockWords(blocks: Block[]): number {
   let text = ''
   for (const b of blocks) {
     switch (b.t) {
+      case 'diagram':
+        text += ' ' + [b.title, b.description, ...b.points.map(point => point.label), ...b.segments.map(segment => segment.label ?? ''), ...(b.circles ?? []).map(circle => circle.label ?? '')].join(' ')
+        break
+      case 'chart':
+        text += ' ' + [b.title, b.xLabel, b.yLabel, b.unit ?? '', ...b.points.flatMap((point) => [point.label, String(point.value)])].join(' ')
+        break
       case 'p':
       case 'note':
       case 'code':
@@ -491,10 +511,44 @@ export function checkAll(
   return errors
 }
 
+export function checkLaunchInventory(
+  templates = TEMPLATES,
+  codeProblems = CODE_PROBLEMS,
+  cards = CARDS,
+): string[] {
+  const errors: string[] = []
+  for (const record of [...templates, ...codeProblems, ...cards]) {
+    if (record.status !== 'published') continue
+    const { author, reviewer, reviewedAt } = record.review
+    if (!reviewer || !reviewedAt || !Number.isFinite(Date.parse(reviewedAt)) || reviewer.trim().toLowerCase() === author.trim().toLowerCase()) {
+      errors.push('Launch content requires dated review by a person other than the author')
+    }
+  }
+  const published = templates.filter((t) => t.status === 'published')
+  for (const [track, required] of [['judgment', 65], ['logic', 55], ['math', 55], ['code', 45]] as const) {
+    const items = track === 'code'
+      ? codeProblems.filter((p) => p.status === 'published').length
+      : published.filter((t) => t.track === track).reduce((n, t) => n + t.levels.length, 0)
+    if (items < required) errors.push(`${track}: ${items} published items; launch requires ${required}`)
+    if (track !== 'code') {
+      const daily = published.filter((t) => t.track === track).reduce((n, t) => n + t.levels.filter((l) => t.dailyLevels?.includes(l.level) && l.initialRating >= 1300 && l.initialRating <= 1700).length, 0)
+      if (daily < 18) errors.push(`${track}: ${daily} eligible published Daily items; launch requires 18`)
+    }
+  }
+  const totalDaily = published.reduce((n, t) => n + t.levels.filter((l) => t.dailyLevels?.includes(l.level) && l.initialRating >= 1300 && l.initialRating <= 1700).length, 0)
+  if (totalDaily < 60) errors.push(`${totalDaily} eligible published Daily items; launch requires 60`)
+  for (const concept of CONCEPTS) {
+    const hasItem = published.some((t) => t.concept === concept.id) || codeProblems.some((p) => p.status === 'published' && p.concept === concept.id)
+    if (!hasItem || !cards.some((c) => c.conceptId === concept.id && c.status === 'published')) errors.push(`${concept.id}: published item and concept card required`)
+  }
+  return errors
+}
+
 // CLI entry point
 if (process.argv[1]?.endsWith('content-check.ts')) {
   console.log('Running Eleanor content checks...')
   const errors = checkAll(TEMPLATES, CONCEPTS, 2000, CODE_PROBLEMS, CARDS)
+  if (process.argv.includes('--launch')) errors.push(...checkLaunchInventory())
 
   if (errors.length > 0) {
     console.error(`\n❌ Content checks failed with ${errors.length} error(s):`)

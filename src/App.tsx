@@ -1,4 +1,4 @@
-import React, { lazy } from 'react'
+import React from 'react'
 import {
   BrowserRouter,
   Routes,
@@ -9,6 +9,10 @@ import {
   useLocation,
 } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth.tsx'
+import { BrandMark, Icon } from './components/Icon.tsx'
+import { Avatar } from './components/Avatar.tsx'
+import { LoadPanel } from './components/LoadPanel.tsx'
+import { ExperienceProvider } from './components/Experience.tsx'
 import { Landing } from './pages/Landing.tsx'
 import { Login } from './pages/Login.tsx'
 import { Onboarding } from './pages/Onboarding.tsx'
@@ -20,20 +24,16 @@ import { Playbook } from './pages/Playbook.tsx'
 import { Leaderboard } from './pages/Leaderboard.tsx'
 import { Profile } from './pages/Profile.tsx'
 import { Settings } from './pages/Settings.tsx'
-import { LoadPanel } from './components/LoadPanel.tsx'
 import { Terms } from './pages/Terms.tsx'
 import { Privacy } from './pages/Privacy.tsx'
 import { Legal } from './pages/Legal.tsx'
-import { Icon } from './components/Icon.tsx'
-import { SoundToggle } from './components/SoundToggle.tsx'
 
-const Admin = lazy(() => import('./pages/Admin.tsx').then((module) => ({ default: module.Admin })))
+const Admin = React.lazy(() => import('./pages/Admin.tsx').then((module) => ({ default: module.Admin })))
 
 function TopBar() {
   const { session, profile, signOut } = useAuth()
   const location = useLocation()
 
-  // During onboarding, simplify top bar to avoid navigation interruptions
   const isOnboarding = location.pathname === '/onboarding'
 
   return (
@@ -44,8 +44,8 @@ function TopBar() {
           className="logo-text"
           aria-label="Eleanor Home"
         >
-          <span className="brand-mark"><Icon name="compass" size={28} /></span>
-          <span>Eleanor<span className="brand-descriptor">THE THINKING GYM</span></span>
+          <BrandMark />
+          <span>eleanor<span className="brand-period">.</span></span>
         </Link>
 
         {session && profile && !isOnboarding && (
@@ -56,7 +56,7 @@ function TopBar() {
                   to="/today"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  <Icon name="compass" size={17} /> Today
+                  <Icon name="today" /><span>Today</span>
                 </NavLink>
               </li>
               <li>
@@ -64,7 +64,7 @@ function TopBar() {
                   to="/daily"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  <Icon name="calendar" size={17} /> Daily
+                  <Icon name="daily" /><span>Daily</span>
                 </NavLink>
               </li>
               <li>
@@ -72,7 +72,7 @@ function TopBar() {
                   to="/progress"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  <Icon name="chart" size={17} /> Progress
+                  <Icon name="progress" /><span>Progress</span>
                 </NavLink>
               </li>
               <li>
@@ -80,7 +80,7 @@ function TopBar() {
                   to="/leaderboard"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  <Icon name="trophy" size={17} /> Leaderboard
+                  <Icon name="leaderboard" /><span>Leaderboard</span>
                 </NavLink>
               </li>
               <li>
@@ -88,12 +88,12 @@ function TopBar() {
                   to="/settings"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  <Icon name="settings" size={17} /> Settings
+                  <Icon name="settings" /><span>Settings</span>
                 </NavLink>
               </li>
-              {session.user.app_metadata.role === 'admin' && <li>
+              {session.user.app_metadata?.role === 'admin' && <li>
                 <NavLink to="/admin" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                  <Icon name="shield" size={17} /> Admin
+                  <Icon name="shield" /><span>Admin</span>
                 </NavLink>
               </li>}
             </ul>
@@ -102,16 +102,17 @@ function TopBar() {
       </div>
 
       <div className="top-bar-right">
-        <SoundToggle />
         {session ? (
-          <div className="account-actions">
+          <div className="profile-controls">
             {profile && (
               <>
                 <Link
                   to={`/u/${profile.handle}`}
                   className="profile-link"
+                  aria-label={`View @${profile.handle}'s profile`}
                 >
-                  @{profile.handle}
+                  <Avatar name={profile.display_name || profile.handle} photo={profile.avatar_data_url} />
+                  <span className="profile-handle">{profile.display_name || `@${profile.handle}`}</span>
                 </Link>
               </>
             )}
@@ -119,16 +120,13 @@ function TopBar() {
               type="button"
               className="btn btn-secondary btn-sm"
               onClick={signOut}
-              aria-label="Sign out"
               data-testid="sign-out-btn"
             >
-              <Icon name="logout" size={17} /><span className="desktop-label">Sign out</span>
+              Sign out
             </button>
           </div>
         ) : (
-          <Link to="/login" className="btn btn-primary btn-sm">
-            Sign in <Icon name="arrow" size={16} />
-          </Link>
+          <><nav className="public-nav" aria-label="Explore Eleanor"><a href="/#sample">The practice</a><Link to="/leaderboard">Leaderboard</Link></nav><Link to="/login" className="btn btn-primary btn-sm">Sign in <Icon name="arrow" /></Link></>
         )}
       </div>
     </header>
@@ -229,7 +227,7 @@ export function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppContent />
+        <ExperienceProvider><AppContent /></ExperienceProvider>
       </AuthProvider>
     </BrowserRouter>
   )

@@ -7,7 +7,8 @@ export async function handleExport(ctx: Ctx): Promise<Response> {
   const [profile] = await sql`
     select id, handle, age_confirmed_at, terms_accepted_at, pledge_accepted_at,
            leaderboard_visible, intensity, set_size, rating_reveal, reduced_motion,
-           theme, weekly_goal, tracks, created_at
+           theme, weekly_goal, tracks, created_at,
+           display_name, avatar_data_url, sound_enabled, celebrations_enabled
     from profiles
     where id = ${ctx.userId}
   `

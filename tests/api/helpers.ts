@@ -1,5 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
+import type { Answer, RawAnswer } from '../../supabase/functions/_shared/content/types.ts'
+
+export function answerInput(answer: Answer): RawAnswer {
+  if (typeof answer === 'string') {
+    try { answer = JSON.parse(answer) }
+    catch { /* Choice IDs and plain strings are already decoded. */ }
+  }
+  return Array.isArray(answer) ? answer : String(answer)
+}
 
 export const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321'
 export const SUPABASE_SECRET_KEY =

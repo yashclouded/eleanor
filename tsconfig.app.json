@@ -22,6 +22,7 @@
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "npm:postgres@*": ["./node_modules/postgres"],
+      "npm:@supabase/supabase-js@*": ["./node_modules/@supabase/supabase-js"],
       "npm:@supabase/server@*": ["./node_modules/@supabase/server"]
     }
   },

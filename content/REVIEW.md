@@ -114,6 +114,45 @@ Human wording, ambiguity, level ordering, skins, and misconception-feedback revi
 | `math.functions.linear-vs-exponential` | Template | draft | GPT-6 | | | [Preview](../build/review/math.functions.linear-vs-exponential.md) |
 | `math.optimization.fence-area` | Template | draft | GPT-6 | | | [Preview](../build/review/math.optimization.fence-area.md) |
 
+### Math depth and variety expansion
+
+32 additional drafts across all eight Math concepts. [Research and family map](../docs/math-research.md). Human wording, pedagogy, originality and difficulty review remain pending; reviewer fields are intentionally blank.
+
+| ID | Kind | Status | Author | Reviewer | Reviewed | Review preview |
+| --- | --- | --- | --- | --- | --- | --- |
+| `math.ratios.foundation.equal-parts` | Template | draft | GPT-6 | | | [Preview](../build/review/math.ratios.foundation.equal-parts.md) |
+| `math.ratios.advanced.integer-blends` | Template | draft | GPT-6 | | | [Preview](../build/review/math.ratios.advanced.integer-blends.md) |
+| `math.ratios.variety.journey-ranking` | Template | draft | GPT-6 | | | [Preview](../build/review/math.ratios.variety.journey-ranking.md) |
+| `math.ratios.variety.nested-partitions` | Template | draft | GPT-6 | | | [Preview](../build/review/math.ratios.variety.nested-partitions.md) |
+| `math.percent-change.foundation.percent-bases` | Template | draft | GPT-6 | | | [Preview](../build/review/math.percent-change.foundation.percent-bases.md) |
+| `math.percent-change.advanced.affine-recurrence` | Template | draft | GPT-6 | | | [Preview](../build/review/math.percent-change.advanced.affine-recurrence.md) |
+| `math.percent-change.variety.coupon-policy` | Template | draft | GPT-6 | | | [Preview](../build/review/math.percent-change.variety.coupon-policy.md) |
+| `math.percent-change.variety.percent-claims` | Template | draft | GPT-6 | | | [Preview](../build/review/math.percent-change.variety.percent-claims.md) |
+| `math.linear.foundation.balance-steps` | Template | draft | GPT-6 | | | [Preview](../build/review/math.linear.foundation.balance-steps.md) |
+| `math.linear.advanced.diophantine-bounds` | Template | draft | GPT-6 | | | [Preview](../build/review/math.linear.advanced.diophantine-bounds.md) |
+| `math.linear.variety.parameter-pencil` | Template | draft | GPT-6 | | | [Preview](../build/review/math.linear.variety.parameter-pencil.md) |
+| `math.linear.variety.absolute-locus` | Template | draft | GPT-6 | | | [Preview](../build/review/math.linear.variety.absolute-locus.md) |
+| `math.sequences.foundation.differences-and-blocks` | Template | draft | GPT-6 | | | [Preview](../build/review/math.sequences.foundation.differences-and-blocks.md) |
+| `math.sequences.advanced.telescoping-recurrences` | Template | draft | GPT-6 | | | [Preview](../build/review/math.sequences.advanced.telescoping-recurrences.md) |
+| `math.sequences.variety.recurrence-audit` | Template | draft | GPT-6 | | | [Preview](../build/review/math.sequences.variety.recurrence-audit.md) |
+| `math.sequences.variety.term-order` | Template | draft | GPT-6 | | | [Preview](../build/review/math.sequences.variety.term-order.md) |
+| `math.divisibility.foundation.remainders-and-factors` | Template | draft | GPT-6 | | | [Preview](../build/review/math.divisibility.foundation.remainders-and-factors.md) |
+| `math.divisibility.advanced.congruence-and-valuation` | Template | draft | GPT-6 | | | [Preview](../build/review/math.divisibility.advanced.congruence-and-valuation.md) |
+| `math.divisibility.variety.residue-claim-audit` | Template | draft | GPT-6 | | | [Preview](../build/review/math.divisibility.variety.residue-claim-audit.md) |
+| `math.divisibility.variety.modular-strategy` | Template | draft | GPT-6 | | | [Preview](../build/review/math.divisibility.variety.modular-strategy.md) |
+| `math.functions.foundation.machines-and-inverses` | Template | draft | GPT-6 | | | [Preview](../build/review/math.functions.foundation.machines-and-inverses.md) |
+| `math.functions.advanced.functional-identities` | Template | draft | GPT-6 | | | [Preview](../build/review/math.functions.advanced.functional-identities.md) |
+| `math.functions.variety.domain-audit` | Template | draft | GPT-6 | | | [Preview](../build/review/math.functions.variety.domain-audit.md) |
+| `math.functions.variety.composition-order` | Template | draft | GPT-6 | | | [Preview](../build/review/math.functions.variety.composition-order.md) |
+| `math.geometry.foundation.measurement` | Template | draft | GPT-6 | | | [Preview](../build/review/math.geometry.foundation.measurement.md) |
+| `math.geometry.advanced.circle-power` | Template | draft | GPT-6 | | | [Preview](../build/review/math.geometry.advanced.circle-power.md) |
+| `math.geometry.variety.transformation-invariants` | Template | draft | GPT-6 | | | [Preview](../build/review/math.geometry.variety.transformation-invariants.md) |
+| `math.geometry.variety.reflection-route` | Template | draft | GPT-6 | | | [Preview](../build/review/math.geometry.variety.reflection-route.md) |
+| `math.optimization.foundation.extrema` | Template | draft | GPT-6 | | | [Preview](../build/review/math.optimization.foundation.extrema.md) |
+| `math.optimization.advanced.constrained-extrema` | Template | draft | GPT-6 | | | [Preview](../build/review/math.optimization.advanced.constrained-extrema.md) |
+| `math.optimization.variety.sharp-bound-audit` | Template | draft | GPT-6 | | | [Preview](../build/review/math.optimization.variety.sharp-bound-audit.md) |
+| `math.optimization.variety.rearrangement-assignment` | Template | draft | GPT-6 | | | [Preview](../build/review/math.optimization.variety.rearrangement-assignment.md) |
+
 ## Task 6.5: Coding problem drafts (43 new, 45 total)
 
 All five drafts per concept remain unpublished. Human reviewers must check originality, ambiguity, provisional difficulty ordering, constraints, editorials, and test coverage. Each family has an echo partner. New problem previews are generated under `build/review/`; executable verification logs are under `build/`.
@@ -163,3 +202,55 @@ All five drafts per concept remain unpublished. Human reviewers must check origi
 | `code.dp.message-repair` | Code | draft | GPT-6 | | | Rating 1300; [Preview](../build/review/code.dp.message-repair.md) |
 | `code.dp.rising-readings` | Code | draft | GPT-6 | | | Rating 1600; [Preview](../build/review/code.dp.rising-readings.md) |
 | `code.dp.paid-bookings` | Code | draft | GPT-6 | | | Rating 2000; [Preview](../build/review/code.dp.paid-bookings.md) |
+
+## Judgment depth expansion — 9 November 2026
+
+All 14 original Judgment templates audited and expanded where needed. Eighteen new draft templates add a foundation and advanced ladder for each of the nine concepts, bringing Judgment to 32 templates and 145 template levels. No reviewer or publication has been assigned.
+
+Research and limitations: [Judgment research](../docs/judgment-research.md). Capacity evidence: [measured report](../build/review/judgment-capacity.json). Visual review: [local graph gallery](../build/review/judgment-visuals.html).
+
+| ID | Type | Status | Author | Reviewer | Date | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| `judgment.frequencies.foundations` | Template | draft | GPT-6 | | | 6 levels; estimated ratings 400–1400; [Preview](../build/review/judgment.frequencies.foundations.md) |
+| `judgment.estimation.foundations` | Template | draft | GPT-6 | | | 6 levels; estimated ratings 400–1400; [Preview](../build/review/judgment.estimation.foundations.md) |
+| `judgment.conditional.foundations` | Template | draft | GPT-6 | | | 6 levels; estimated ratings 400–1400; [Preview](../build/review/judgment.conditional.foundations.md) |
+| `judgment.base-rates.foundations` | Template | draft | GPT-6 | | | 6 levels; estimated ratings 400–1400; [Preview](../build/review/judgment.base-rates.foundations.md) |
+| `judgment.expected-value.foundations` | Template | draft | GPT-6 | | | 6 levels; estimated ratings 400–1400; [Preview](../build/review/judgment.expected-value.foundations.md) |
+| `judgment.risk-framing.foundations` | Template | draft | GPT-6 | | | 6 levels; estimated ratings 400–1400; [Preview](../build/review/judgment.risk-framing.foundations.md) |
+| `judgment.independence.foundations` | Template | draft | GPT-6 | | | 6 levels; estimated ratings 400–1400; [Preview](../build/review/judgment.independence.foundations.md) |
+| `judgment.regression.foundations` | Template | draft | GPT-6 | | | 6 levels; estimated ratings 400–1400; [Preview](../build/review/judgment.regression.foundations.md) |
+| `judgment.odds.foundations` | Template | draft | GPT-6 | | | 6 levels; estimated ratings 400–1400; [Preview](../build/review/judgment.odds.foundations.md) |
+| `judgment.frequencies.standardized-mixtures` | Template | draft | GPT-6 | | | 4 levels; estimated ratings 1800–2700; [Preview](../build/review/judgment.frequencies.standardized-mixtures.md) |
+| `judgment.estimation.joint-bounds` | Template | draft | GPT-6 | | | 4 levels; estimated ratings 1800–2700; [Preview](../build/review/judgment.estimation.joint-bounds.md) |
+| `judgment.conditional.selection-filter` | Template | draft | GPT-6 | | | 4 levels; estimated ratings 1800–2700; [Preview](../build/review/judgment.conditional.selection-filter.md) |
+| `judgment.base-rate.dependent-evidence` | Template | draft | GPT-6 | | | 4 levels; estimated ratings 1800–2700; [Preview](../build/review/judgment.base-rate.dependent-evidence.md) |
+| `judgment.expected-value.information-policy` | Template | draft | GPT-6 | | | 4 levels; estimated ratings 1800–2700; [Preview](../build/review/judgment.expected-value.information-policy.md) |
+| `judgment.risk-framing.heterogeneous-allocation` | Template | draft | GPT-6 | | | 4 levels; estimated ratings 1800–2700; [Preview](../build/review/judgment.risk-framing.heterogeneous-allocation.md) |
+| `judgment.independence.common-cause-networks` | Template | draft | GPT-6 | | | 4 levels; estimated ratings 1800–2700; [Preview](../build/review/judgment.independence.common-cause-networks.md) |
+| `judgment.regression.precision-updates` | Template | draft | GPT-6 | | | 4 levels; estimated ratings 1800–2700; [Preview](../build/review/judgment.regression.precision-updates.md) |
+| `judgment.odds.competing-hypotheses` | Template | draft | GPT-6 | | | 4 levels; estimated ratings 1800–2700; [Preview](../build/review/judgment.odds.competing-hypotheses.md) |
+
+## Judgment structural variety — 10 November 2026
+
+Eighteen original families add new inference/decision structures across all nine concepts: five single-choice, four claim-selection, three ordering and six numerical families. Judgment now has 50 templates, 207 levels and 50 families. Research and distinctions: [variety notes](../docs/judgment-variety.md). [Interactive review gallery](../build/review/judgment-variety.html). Human review, calibrated ratings and publication remain pending.
+
+| ID | Type | Status | Author | Reviewer | Date | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| `judgment.frequencies.variety.inverse-inclusion` | Template | draft | GPT-6 | | | number; 4 levels; estimated 1000–2200; [Preview](../build/review/judgment.frequencies.variety.inverse-inclusion.md) |
+| `judgment.frequencies.variety.sampling-audit` | Template | draft | GPT-6 | | | multi; 3 levels; estimated 1000–1800; [Preview](../build/review/judgment.frequencies.variety.sampling-audit.md) |
+| `judgment.estimation.variety.capture-recapture` | Template | draft | GPT-6 | | | number; 4 levels; estimated 1000–2200; [Preview](../build/review/judgment.estimation.variety.capture-recapture.md) |
+| `judgment.estimation.variety.bottleneck-ranking` | Template | draft | GPT-6 | | | sequence; 4 levels; estimated 1000–2200; [Preview](../build/review/judgment.estimation.variety.bottleneck-ranking.md) |
+| `judgment.regression.variety.control-contrasts` | Template | draft | GPT-6 | | | number; 4 levels; estimated 1000–2200; [Preview](../build/review/judgment.regression.variety.control-contrasts.md) |
+| `judgment.regression.variety.forecast-claim-audit` | Template | draft | GPT-6 | | | multi; 3 levels; estimated 1000–2200; [Preview](../build/review/judgment.regression.variety.forecast-claim-audit.md) |
+| `judgment.conditional.variety.host-protocol` | Template | draft | GPT-6 | | | number; 4 levels; estimated 900–2100; [Preview](../build/review/judgment.conditional.variety.host-protocol.md) |
+| `judgment.conditional.variety.report-protocol` | Template | draft | GPT-6 | | | choice; 4 levels; estimated 900–2100; [Preview](../build/review/judgment.conditional.variety.report-protocol.md) |
+| `judgment.base-rates.variety.inverse-prevalence` | Template | draft | GPT-6 | | | number; 4 levels; estimated 900–2100; [Preview](../build/review/judgment.base-rates.variety.inverse-prevalence.md) |
+| `judgment.base-rates.variety.operating-point` | Template | draft | GPT-6 | | | choice; 4 levels; estimated 900–2100; [Preview](../build/review/judgment.base-rates.variety.operating-point.md) |
+| `judgment.independence.variety.joint-law-audit` | Template | draft | GPT-6 | | | multi; 3 levels; estimated 1200–2000; [Preview](../build/review/judgment.independence.variety.joint-law-audit.md) |
+| `judgment.independence.variety.reliability-order` | Template | draft | GPT-6 | | | sequence; 3 levels; estimated 1200–2000; [Preview](../build/review/judgment.independence.variety.reliability-order.md) |
+| `judgment.expected-value.variety.minimax-regret` | Template | draft | GPT-6 | | | choice; 3 levels; estimated 900–2100; [Preview](../build/review/judgment.expected-value.variety.minimax-regret.md) |
+| `judgment.expected-value.variety.finite-stopping` | Template | draft | GPT-6 | | | number; 3 levels; estimated 1100–2300; [Preview](../build/review/judgment.expected-value.variety.finite-stopping.md) |
+| `judgment.risk-framing.variety.pareto-screen` | Template | draft | GPT-6 | | | multi; 3 levels; estimated 800–2000; [Preview](../build/review/judgment.risk-framing.variety.pareto-screen.md) |
+| `judgment.risk-framing.variety.report-repair` | Template | draft | GPT-6 | | | choice; 3 levels; estimated 800–2000; [Preview](../build/review/judgment.risk-framing.variety.report-repair.md) |
+| `judgment.odds.variety.evidence-provenance` | Template | draft | GPT-6 | | | sequence; 3 levels; estimated 1300–2500; [Preview](../build/review/judgment.odds.variety.evidence-provenance.md) |
+| `judgment.odds.variety.coherent-price-book` | Template | draft | GPT-6 | | | choice; 3 levels; estimated 1000–2400; [Preview](../build/review/judgment.odds.variety.coherent-price-book.md) |

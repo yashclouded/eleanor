@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest'
-import { call, createTestUser, createUserClient, testSql } from './helpers.ts'
+import { answerInput, call, createTestUser, createUserClient, testSql } from './helpers.ts'
 
 describe('API: Repair ladder, reveal and playbook', () => {
   afterAll(async () => {
@@ -67,7 +67,7 @@ describe('API: Repair ladder, reveal and playbook', () => {
       `/attempts/${attempt.id}/commit`,
       {
         transitionId: crypto.randomUUID(),
-        answer: String(sec.answer),
+        answer: answerInput(sec.answer),
         confidence: 0.9,
         declaredHelp: false,
       },
@@ -88,12 +88,18 @@ describe('API: Repair ladder, reveal and playbook', () => {
     const user = await onboardUser('rep_step')
     const { attempt } = await startAttempt(user)
 
+    const [secret] = await testSql`select misconceptions from instance_secrets
+      where instance_id = (select instance_id from attempts where id = ${attempt.id})`
+    const misconceptions = typeof secret.misconceptions === 'string' ? JSON.parse(secret.misconceptions) : secret.misconceptions
+    const wrong = (misconceptions as { value: number | string | string[] | null }[]).find((entry) => entry.value !== null)
+    expect(wrong).toBeDefined()
+
     // Commit incorrectly
     const commitRes = await call(
       `/attempts/${attempt.id}/commit`,
       {
         transitionId: crypto.randomUUID(),
-        answer: '999999',
+        answer: answerInput(wrong!.value!),
         confidence: 0.8,
         declaredHelp: false,
       },
@@ -298,7 +304,7 @@ describe('API: Repair ladder, reveal and playbook', () => {
     `
     await testSql`
       update attempts
-      set resolved_at = now() - interval '2 hours'
+      set presented_at = now() - interval '2 hours', resolved_at = now() - interval '2 hours'
       where id = ${attempt1.id}
     `
 

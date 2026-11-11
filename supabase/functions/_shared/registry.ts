@@ -14,6 +14,11 @@ import { independenceCompoundEventsTemplate } from './content/judgment/independe
 import { independenceAtLeastOneTemplate } from './content/judgment/independence-at-least-one.ts'
 import { regressionSelectionEffectTemplate } from './content/judgment/regression-selection-effect.ts'
 import { oddsLikelihoodRatioTemplate } from './content/judgment/odds-likelihood-ratio.ts'
+import { JUDGMENT_FOUNDATIONS } from './content/judgment/foundations.ts'
+import { JUDGMENT_ADVANCED } from './content/judgment/advanced.ts'
+import { VARIETY_DATA } from './content/judgment/variety-data.ts'
+import { VARIETY_PROBABILITY } from './content/judgment/variety-probability.ts'
+import { VARIETY_DECISIONS } from './content/judgment/variety-decisions.ts'
 import { chainsTemplate, contrapositiveTemplate, cardSelectionTemplate } from './content/logic/deduction.ts'
 import { lineUpTemplate, scheduleTemplate } from './content/logic/ordering.ts'
 import { arrangementsTemplate, inclusionExclusionTemplate, pigeonholeTemplate } from './content/logic/counting.ts'
@@ -26,6 +31,9 @@ import { wordEquationsTemplate, twoUnknownsTemplate } from './content/math/linea
 import { similarTrianglesTemplate, pythagorasTemplate } from './content/math/geometry.ts'
 import { sequencesTemplate, gcdLcmTemplate } from './content/math/sequences-divisibility.ts'
 import { linearExponentialTemplate, fenceAreaTemplate } from './content/math/functions-optimization.ts'
+import { MATH_ARITHMETIC } from './content/math/depth-arithmetic.ts'
+import { MATH_DISCRETE } from './content/math/depth-discrete.ts'
+import { MATH_SPATIAL } from './content/math/depth-spatial.ts'
 import { JUDGMENT_CARDS } from './content/cards/judgment.ts'
 import { LOGIC_CARDS } from './content/cards/logic.ts'
 import { MATH_CARDS } from './content/cards/math.ts'
@@ -48,6 +56,11 @@ export const CODE_PROBLEMS: CodeProblem[] = [
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const TEMPLATES: Template<any>[] = [
+  ...JUDGMENT_FOUNDATIONS,
+  ...JUDGMENT_ADVANCED,
+  ...VARIETY_DATA,
+  ...VARIETY_PROBABILITY,
+  ...VARIETY_DECISIONS,
   countingTableTemplate,
   fermiQuantityTemplate,
   conditionalTwoWayTemplate,
@@ -86,6 +99,9 @@ export const TEMPLATES: Template<any>[] = [
   gcdLcmTemplate,
   linearExponentialTemplate,
   fenceAreaTemplate,
+  ...MATH_ARITHMETIC,
+  ...MATH_DISCRETE,
+  ...MATH_SPATIAL,
 ]
 
 export const CARDS: ConceptCard[] = [

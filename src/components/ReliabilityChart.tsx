@@ -24,8 +24,10 @@ export function ReliabilityChart({
   // Omit empty bins (n === 0)
   const activeLearnerBins = learnerBins.filter((b) => b.n > 0)
   const activeModelBins = modelBins ? modelBins.filter((b) => b.n > 0) : []
-  const modelOnly = activeLearnerBins.length === 0 && activeModelBins.length > 0
-  const tableBins = modelOnly ? activeModelBins : activeLearnerBins
+  const hasLearner = learnerBins.length > 0
+  const tableBins = [...activeLearnerBins, ...activeModelBins.filter((model) =>
+    !activeLearnerBins.some((learner) => learner.lo === model.lo && learner.hi === model.hi)
+  )].sort((a, b) => a.lo - b.lo)
 
   // SVG dimensions (square plot for 1:1 probability calibration)
   const width = 420
@@ -59,7 +61,7 @@ export function ReliabilityChart({
         }, '')
       : ''
 
-  const ariaLabel = `Reliability diagram: predicted probability vs observed accuracy across ${tableBins.length} populated confidence bins`
+  const ariaLabel = `Reliability diagram: predicted probability vs observed accuracy across ${hasLearner ? activeLearnerBins.length : activeModelBins.length} populated ${hasLearner ? 'confidence' : 'model'} bins`
 
   return (
     <div className="chart-card" data-testid="reliability-chart-container">
@@ -146,7 +148,7 @@ export function ReliabilityChart({
             fontWeight="500"
             fill="var(--text-muted)"
           >
-            Stated Confidence / Forecast (p)
+            {hasLearner ? 'Stated Confidence / Forecast (p)' : 'Model Forecast (p)'}
           </text>
           <text
             transform={`rotate(-90 ${padLeft - 30} ${padTop + plotHeight / 2})`}
@@ -244,7 +246,7 @@ export function ReliabilityChart({
 
         {/* Legend */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-4)', marginTop: 'var(--space-2)', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-          {!modelOnly && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+          {hasLearner && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}>
             <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
             You
           </span>}
@@ -273,11 +275,9 @@ export function ReliabilityChart({
             <thead>
               <tr>
                 <th scope="col">Bin</th>
-                {!modelOnly && <>
-                  <th scope="col">Learner (n)</th>
-                  <th scope="col">Mean Confidence</th>
-                  <th scope="col">Accuracy</th>
-                </>}
+                {hasLearner && <><th scope="col">Learner (n)</th>
+                <th scope="col">Mean Confidence</th>
+                <th scope="col">Accuracy</th></>}
                 {activeModelBins.length > 0 && (
                   <>
                     <th scope="col">Model (n)</th>
@@ -288,19 +288,20 @@ export function ReliabilityChart({
               </tr>
             </thead>
             <tbody>
-              {tableBins.map((b, idx) => {
-                const mb = activeModelBins[idx]
+              {tableBins.map((b) => {
+                const lb = activeLearnerBins.find((bin) => bin.lo === b.lo && bin.hi === b.hi)
+                const mb = activeModelBins.find((bin) => bin.lo === b.lo && bin.hi === b.hi)
                 return (
-                  <tr key={idx}>
+                  <tr key={b.lo}>
                     <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
                       {`${b.lo.toFixed(1)}–${b.hi.toFixed(1)}`}
                     </td>
-                    {!modelOnly && <><td>{`n=${b.n}`}</td>
+                    {hasLearner && <><td>{lb ? `n=${lb.n}` : '—'}</td>
                     <td style={{ fontFamily: 'var(--font-mono)' }}>
-                      {`${Math.round(b.meanP * 100)}%`}
+                      {lb ? `${Math.round(lb.meanP * 100)}%` : '—'}
                     </td>
                     <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                      {`${Math.round(b.meanY * 100)}%`}
+                      {lb ? `${Math.round(lb.meanY * 100)}%` : '—'}
                     </td></>}
                     {activeModelBins.length > 0 && (
                       <>

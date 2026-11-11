@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest'
-import { call, createTestUser, testSql } from './helpers.ts'
+import { answerInput, call, createTestUser, testSql } from './helpers.ts'
 
 describe('API: Commit and give-up (the rated transaction)', () => {
   afterAll(async () => {
@@ -48,7 +48,7 @@ describe('API: Commit and give-up (the rated transaction)', () => {
 
     // Retrieve answer from instance_secrets
     const [secret] = await testSql`select answer from instance_secrets where instance_id = (select instance_id from attempts where id = ${attempt.id})`
-    const rawAnswer = secret.answer
+    const rawAnswer = answerInput(secret.answer)
 
     const res = await call(
       `/attempts/${attempt.id}/commit`,
@@ -125,7 +125,7 @@ describe('API: Commit and give-up (the rated transaction)', () => {
     const user2 = await onboardUser('cmt_conc2')
     const { attempt: attempt2 } = await startAttempt(user2)
     const [sec2] = await testSql`select answer from instance_secrets where instance_id = (select instance_id from attempts where id = ${attempt2.id})`
-    const rawAnswer2 = String(sec2.answer)
+    const rawAnswer2 = answerInput(sec2.answer)
 
     const [resA, resB] = await Promise.all([
       call(
@@ -251,7 +251,7 @@ describe('API: Commit and give-up (the rated transaction)', () => {
       `/attempts/${attempt.id}/commit`,
       {
         transitionId: crypto.randomUUID(),
-        answer: secret.answer,
+        answer: answerInput(secret.answer),
         confidence: 0.9,
         declaredHelp: true,
       },
@@ -287,7 +287,7 @@ describe('API: Commit and give-up (the rated transaction)', () => {
       `/attempts/${attempt.id}/commit`,
       {
         transitionId: crypto.randomUUID(),
-        answer: secret.answer,
+        answer: answerInput(secret.answer),
         confidence: 0.9,
         declaredHelp: false,
       },
@@ -308,14 +308,14 @@ describe('API: Commit and give-up (the rated transaction)', () => {
 
     const [sec] = await testSql`select misconceptions from instance_secrets where instance_id = (select instance_id from attempts where id = ${attempt.id})`
     const mList = typeof sec.misconceptions === 'string' ? JSON.parse(sec.misconceptions) : sec.misconceptions
-    const misc = (mList as Array<{ id: string; value: unknown }>)[0]
+    const misc = (mList as Array<{ id: string; value: unknown }>).find((m) => m.value !== null)
     expect(misc).toBeDefined()
 
     const res = await call(
       `/attempts/${attempt.id}/commit`,
       {
         transitionId: crypto.randomUUID(),
-        answer: String(misc?.value),
+        answer: answerInput(misc!.value as number | string | string[]),
         confidence: 0.8,
         declaredHelp: false,
       },
@@ -327,10 +327,10 @@ describe('API: Commit and give-up (the rated transaction)', () => {
     const result = res.data.data
     expect(result.outcome).toBe('incorrect')
     expect(result.misconception).toBeDefined()
-    expect(result.misconception?.id).toBe(misc.id)
+    expect(result.misconception?.id).toBe(misc!.id)
 
     // Check misconception_stats
-    const [ms] = await testSql`select weight from misconception_stats where misconception_id = ${misc.id} and user_id = (select user_id from attempts where id = ${attempt.id})`
+    const [ms] = await testSql`select weight from misconception_stats where misconception_id = ${misc!.id} and user_id = (select user_id from attempts where id = ${attempt.id})`
     expect(Number(ms.weight)).toBe(1)
   })
 
@@ -345,7 +345,7 @@ describe('API: Commit and give-up (the rated transaction)', () => {
       `/attempts/${attempt.id}/commit`,
       {
         transitionId: crypto.randomUUID(),
-        answer: secret.answer,
+        answer: answerInput(secret.answer),
         confidence: 0.9,
         declaredHelp: false,
       },
@@ -421,7 +421,7 @@ describe('API: Commit and give-up (the rated transaction)', () => {
       `/attempts/${triggerAtt.id}/commit`,
       {
         transitionId: crypto.randomUUID(),
-        answer: triggerAnswer,
+        answer: answerInput(triggerAnswer),
         confidence: 0.9,
         declaredHelp: false,
       },
@@ -453,7 +453,7 @@ describe('API: Commit and give-up (the rated transaction)', () => {
       `/attempts/${attempt.id}/commit`,
       {
         transitionId: crypto.randomUUID(),
-        answer: String(sec.answer),
+        answer: answerInput(sec.answer),
         confidence: 0.9,
         declaredHelp: false,
       },

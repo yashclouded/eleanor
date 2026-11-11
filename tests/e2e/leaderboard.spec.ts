@@ -1,4 +1,4 @@
-import { test, expect, type Page } from './fixtures.ts'
+import { test, expect, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
 
@@ -16,7 +16,7 @@ const testSql = postgres(
   { prepare: false, max: 2 }
 )
 
-const MAILPIT_URL = process.env.MAILPIT_URL || 'http://127.0.0.1:54324'
+const MAILPIT_URL = 'http://127.0.0.1:54324'
 
 interface MailpitMessageSummary {
   ID: string
@@ -40,7 +40,7 @@ async function getMagicLinkForEmail(email: string, maxAttempts = 20): Promise<st
       const detail = await detailRes.json()
       const body = detail.Text || detail.HTML || ''
 
-      const match = body.match(/https?:\/\/[^\s"'<>]+\/auth\/v1\/verify\?[^\s"'<>]+/i)
+      const match = body.match(/http:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify\?[^\s"'<>]+/i)
       if (match) {
         return match[0].replace(/&amp;/g, '&')
       }
@@ -167,7 +167,7 @@ test.describe('Task 4.5: Leaderboards and Public Profiles', () => {
       on conflict (id) do update set text = excluded.text
     `
 
-    // Refresh the private snapshot behind the public leaderboard view
+    // Refresh the materialized view public.leaderboard
     await testSql`refresh materialized view private.leaderboard`
   })
 

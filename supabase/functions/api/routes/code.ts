@@ -75,6 +75,8 @@ export async function handleCodeRun(ctx: Ctx): Promise<Response> {
     throw new HttpError('not_found', 'Attempt not found')
   }
 
+  const spec: AnswerSpec = typeof attempt.answer_spec === 'string' ? JSON.parse(attempt.answer_spec) : attempt.answer_spec
+  if (spec.type !== 'code') throw new HttpError('invalid', 'Not a code attempt')
   await sql.begin((tx) => rateLimit(tx, ctx.userId, 'code_run', 20, '10 minutes'))
 
   const problem = CODE_PROBLEMS.find((p) => p.id === attempt.item_id.split('@')[0])

@@ -243,7 +243,7 @@ export const conditionalTwoWayTemplate: Template<ConditionalTwoWayParams> = {
           tableBlock,
           {
             t: 'p',
-            text: 'Given that a weld showed No Alert, what is the probability (as a percentage) that it actually had a Flaw Verified (false negative rate)?',
+            text: 'Given that a weld showed No Alert, what is the probability (as a percentage) that it actually had a Flaw Verified (false omission rate)?',
           },
         ]
       } else {

@@ -3,6 +3,7 @@ import {
   createTestUser,
   call,
   testSql,
+  answerInput,
 } from './helpers.ts'
 import { getEffectiveNow } from '../../supabase/functions/_shared/daily.ts'
 
@@ -189,7 +190,8 @@ describe('Task 3.5: Daily Crux and crowd stats', () => {
     expect(dailyRes.status).toBe(200)
     const attempt = dailyRes.data.data.attempt
 
-    const rawAnswer = attempt.answerSpec.type === 'multi' ? ['A'] : '10'
+    const [secret] = await testSql`select s.answer from attempts a join instance_secrets s on s.instance_id = a.instance_id where a.id = ${attempt.id}`
+    const rawAnswer = answerInput(secret.answer)
 
     const commitRes = await call(
       `/attempts/${attempt.id}/commit`,
@@ -201,7 +203,7 @@ describe('Task 3.5: Daily Crux and crowd stats', () => {
       user1Token,
       'POST'
     )
-    expect(commitRes.status).toBe(200)
+    expect(commitRes.status, JSON.stringify({ response: commitRes.data, spec: attempt.answerSpec, rawAnswer })).toBe(200)
     expect(commitRes.data.ok).toBe(true)
 
     const ratingEvents = await testSql`
@@ -241,7 +243,8 @@ describe('Task 3.5: Daily Crux and crowd stats', () => {
     expect(statsBefore.status).toBe(403)
 
     // User commits
-    const rawAnswer = attempt.answerSpec.type === 'multi' ? ['A'] : '10'
+    const [secret] = await testSql`select s.answer from attempts a join instance_secrets s on s.instance_id = a.instance_id where a.id = ${attempt.id}`
+    const rawAnswer = answerInput(secret.answer)
     const commitRes = await call(
       `/attempts/${attempt.id}/commit`,
       {

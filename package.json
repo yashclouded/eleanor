@@ -28,7 +28,10 @@
     "content:code:build": "DEVELOPER_DIR=/Library/Developer/CommandLineTools tsx scripts/code-build.ts",
     "content:sync": "tsx scripts/content-sync.ts",
     "model:simulate": "tsx scripts/simulate.ts",
-    "model:replay": "tsx scripts/model-replay.ts"
+    "model:replay": "tsx scripts/model-replay.ts",
+    "content:capacity:judgment": "node --import tsx scripts/judgment-capacity.ts",
+    "content:capacity:math": "node --import tsx scripts/math-capacity.ts",
+    "content:check:launch": "tsx scripts/content-check.ts --launch"
   },
   "dependencies": {
     "@codemirror/lang-cpp": "6.0.3",
@@ -38,7 +41,7 @@
     "codemirror": "6.0.2",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "react-router-dom": "6.30.6"
+    "react-router-dom": "7.18.4"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.10.1",

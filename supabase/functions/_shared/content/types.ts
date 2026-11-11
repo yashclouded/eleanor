@@ -7,6 +7,8 @@ export type Block =
   | { t: 'code'; text: string }
   | { t: 'list'; items: string[]; ordered?: boolean }
   | { t: 'table'; head: string[]; rows: string[][]; caption?: string }
+  | { t: 'chart'; kind: 'bar' | 'line'; title: string; xLabel: string; yLabel: string; unit?: string; points: { label: string; value: number }[] }
+  | { t: 'diagram'; title: string; description: string; points: { label: string; x: number; y: number }[]; segments: { from: number; to: number; label?: string }[]; circles?: { x: number; y: number; r: number; label?: string }[] }
 
 export type Tolerance = { abs?: number; rel?: number }
 

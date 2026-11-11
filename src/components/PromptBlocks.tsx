@@ -1,4 +1,6 @@
 import type { Block } from '../../supabase/functions/_shared/content/types.ts'
+import { QuestionChart } from './QuestionChart.tsx'
+import { QuestionDiagram } from './QuestionDiagram.tsx'
 
 interface PromptBlocksProps {
   blocks: Block[]
@@ -14,6 +16,12 @@ export function PromptBlocks({ blocks, className = '' }: PromptBlocksProps) {
     <div className={`prompt-blocks ${className}`.trim()} data-testid="prompt-blocks">
       {blocks.map((block, idx) => {
         switch (block.t) {
+          case 'diagram':
+            return <QuestionDiagram key={idx} diagram={block} />
+
+          case 'chart':
+            return <QuestionChart key={idx} chart={block} />
+
           case 'p':
             return (
               <p key={idx} className="prompt-p" style={{ marginBottom: 'var(--space-3)', lineHeight: 1.6 }}>

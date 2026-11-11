@@ -14,7 +14,7 @@ const steps: Step<IndependenceAtLeastOneParams>[] = [
     prompt: () => [
       {
         t: 'p',
-        text: 'What is the probability (as a percentage) that a single trial experiences NO occurrence (the event fails to occur)?',
+        text: 'What is the probability (as a percentage) that the first trial experiences NO occurrence (the event fails to occur)?',
       },
     ],
     answer: (p) => 100 - p.pSinglePercent,
@@ -56,10 +56,12 @@ const steps: Step<IndependenceAtLeastOneParams>[] = [
     },
   },
   {
-    prompt: () => [
+    prompt: (p) => [
       {
         t: 'p',
-        text: 'Subtract the non-occurrence probability from 100% to calculate the probability of at least one occurrence.',
+        text: p.level === 3
+          ? 'Subtract the probabilities of zero and exactly one occurrence from 100% to find the probability of at least two occurrences.'
+          : 'Subtract the non-occurrence probability from 100% to calculate the probability of at least one occurrence.',
       },
     ],
     answer: (p) => {
@@ -124,14 +126,14 @@ export const independenceAtLeastOneTemplate: Template<IndependenceAtLeastOnePara
 
   sample(rng: Rng, level: number): IndependenceAtLeastOneParams {
     if (level === 1) {
-      const pSinglePercent = rng.pick([5, 8, 10, 12, 15, 18, 20, 25, 30, 35])
-      const numTrials = rng.pick([3, 4, 5, 6, 7, 8])
+      const pSinglePercent = rng.int(5, 35)
+      const numTrials = rng.int(3, 10)
       return { level, pSinglePercent, numTrials }
     } else if (level === 2) {
-      const p1 = rng.pick([10, 12, 15, 18, 20])
-      const p2 = rng.pick([12, 15, 20, 22, 25])
-      const p3 = rng.pick([20, 25, 30, 35])
-      const p4 = rng.pick([10, 20, 25, 30, 40])
+      const p1 = rng.int(10, 20)
+      const p2 = rng.int(12, 25)
+      const p3 = rng.int(20, 35)
+      const p4 = rng.int(10, 40)
       return {
         level,
         pSinglePercent: p1,
@@ -139,12 +141,12 @@ export const independenceAtLeastOneTemplate: Template<IndependenceAtLeastOnePara
         probsArray: [p1, p2, p3, p4],
       }
     } else if (level === 3) {
-      const pSinglePercent = rng.pick([15, 20, 25, 30, 35, 40, 45, 50])
-      const numTrials = rng.pick([4, 5, 6, 7, 8, 9, 10])
+      const pSinglePercent = rng.int(15, 50)
+      const numTrials = rng.int(4, 10)
       return { level, pSinglePercent, numTrials }
     } else {
-      const pSinglePercent = rng.pick([1, 2, 3, 4, 5, 6, 8, 10])
-      const numTrials = rng.pick([10, 12, 15, 18, 20, 25, 30, 40])
+      const pSinglePercent = rng.int(1, 10)
+      const numTrials = rng.int(10, 40)
       return { level, pSinglePercent, numTrials }
     }
   },
@@ -167,12 +169,17 @@ export const independenceAtLeastOneTemplate: Template<IndependenceAtLeastOnePara
   verify(p: IndependenceAtLeastOneParams): Answer {
     // Independent derivation using binomial expansion sum
     if (p.level === 2 && p.probsArray) {
-      // Direct expansion over 4 trials: 1 - product of complements
-      const q1 = 1 - p.probsArray[0] / 100
-      const q2 = 1 - p.probsArray[1] / 100
-      const q3 = 1 - p.probsArray[2] / 100
-      const q4 = 1 - p.probsArray[3] / 100
-      return (1 - q1 * q2 * q3 * q4) * 100
+      // Enumerate the non-empty success subsets instead of using the complement.
+      let sum = 0
+      for (let mask = 1; mask < 2 ** p.probsArray.length; mask++) {
+        let probability = 1
+        for (let i = 0; i < p.probsArray.length; i++) {
+          const chance = p.probsArray[i] / 100
+          probability *= mask & (1 << i) ? chance : 1 - chance
+        }
+        sum += probability
+      }
+      return sum * 100
     }
 
     const prob = p.pSinglePercent / 100
@@ -269,7 +276,7 @@ export const independenceAtLeastOneTemplate: Template<IndependenceAtLeastOnePara
         return [
           {
             t: 'p',
-            text: `Exploratory drilling samples 4 distinct geological anomaly sites with the following strike probabilities: ${probsStr}.`,
+            text: `Exploratory drilling samples 4 independent geological anomaly sites with the following strike probabilities: ${probsStr}.`,
           },
           {
             t: 'p',
@@ -280,7 +287,7 @@ export const independenceAtLeastOneTemplate: Template<IndependenceAtLeastOnePara
         return [
           {
             t: 'p',
-            text: `An exploratory survey drills ${p.numTrials} boreholes. Each borehole has a ${p.pSinglePercent}% chance of striking commercial grade ore. To justify building a processing plant, geologists need at least two successful strikes.`,
+            text: `An exploratory survey drills ${p.numTrials} independent boreholes. Each borehole has a ${p.pSinglePercent}% chance of striking commercial grade ore. To justify building a processing plant, geologists need at least two successful strikes.`,
           },
           {
             t: 'p',
@@ -317,7 +324,7 @@ export const independenceAtLeastOneTemplate: Template<IndependenceAtLeastOnePara
         return [
           {
             t: 'p',
-            text: `A security perimeter monitors 4 honeypot sensors with individual detection probabilities: ${probsStr}.`,
+            text: `A security perimeter monitors 4 independent honeypot sensors with individual detection probabilities: ${probsStr}.`,
           },
           {
             t: 'p',
@@ -392,21 +399,27 @@ export const independenceAtLeastOneTemplate: Template<IndependenceAtLeastOnePara
     const prob = p.pSinglePercent / 100
     const q = 1 - prob
     const n = p.numTrials
-    const pZero = Math.pow(q, n)
-    const atLeastOne = (1 - pZero) * 100
+    const pZero = p.level === 2 && p.probsArray
+      ? p.probsArray.reduce((product, chance) => product * (1 - chance / 100), 1)
+      : Math.pow(q, n)
+    const pOne = p.level === 3 ? n * prob * Math.pow(q, n - 1) : 0
+    const target = p.level === 3 ? 'at least two' : 'at least one'
+    const items = [
+      p.level === 2 && p.probsArray
+        ? `P(zero successes) = ${p.probsArray.map((chance) => `(1 − ${chance / 100})`).join(' × ')} = ${(pZero * 100).toFixed(2)}%`
+        : `P(zero successes in ${n} trials) = (1 − ${prob})^${n} = ${(pZero * 100).toFixed(2)}%`,
+    ]
+    if (p.level === 3) items.push(`P(exactly one success) = ${n} × ${prob} × ${q}^${n - 1} = ${(pOne * 100).toFixed(2)}%`)
+    items.push(`P(${target} success${p.level === 3 ? 'es' : ''}) = 100% − ${(pZero * 100).toFixed(2)}%${p.level === 3 ? ` − ${(pOne * 100).toFixed(2)}%` : ''} = ${((1 - pZero - pOne) * 100).toFixed(2)}%`)
 
     return [
       {
         t: 'p',
-        text: 'The probability of "at least one" success across independent events is found via the complement rule:',
+        text: `Find the probability of ${target} successes by subtracting the excluded outcomes from 100%:`,
       },
       {
         t: 'list',
-        items: [
-          `P(failure on single trial) = 1 − ${p.pSinglePercent}% = ${(q * 100).toFixed(1)}%`,
-          `P(zero successes in ${n} trials) = (${(q * 100).toFixed(1)}%)^${n} = ${(pZero * 100).toFixed(2)}%`,
-          `P(at least one success) = 100% − ${(pZero * 100).toFixed(2)}% = ${atLeastOne.toFixed(2)}%`,
-        ],
+        items,
       },
     ]
   },

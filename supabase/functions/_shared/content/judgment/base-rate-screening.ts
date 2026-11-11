@@ -125,10 +125,10 @@ const steps: Step<BaseRateScreeningParams>[] = [
     },
   },
   {
-    prompt: () => [
+    prompt: (p) => [
       {
         t: 'p',
-        text: 'What percentage of flagged cases are actually true cases?',
+        text: p.level === 4 ? 'What percentage of cases positive on both tests are true cases?' : 'What percentage of flagged cases are actually true cases?',
       },
     ],
     answer: (p) => {
@@ -149,10 +149,12 @@ const steps: Step<BaseRateScreeningParams>[] = [
       return (tp / (tp + fp)) * 100
     },
     tolerance: { abs: 0.1 },
-    explain: () => [
+    explain: (p) => [
       {
         t: 'p',
-        text: 'Divide true positives by total flagged cases and multiply by 100 to obtain the final percentage.',
+        text: p.level === 4
+          ? 'Multiply the first-test true-positive count by the second-test sensitivity, and the first-test false-positive count by the second-test false-positive rate. Divide true cases positive on both tests by all cases positive on both tests, then multiply by 100.'
+          : 'Divide true positives by total flagged cases and multiply by 100 to obtain the final percentage.',
       },
     ],
   },
@@ -181,15 +183,10 @@ export const baseRateScreeningTemplate: Template<BaseRateScreeningParams> = {
   dailyLevels: [3],
 
   sample(rng: Rng, level: number): BaseRateScreeningParams {
-    const baseRates = [1, 2, 4, 5]
-    const sensitivities = [80, 85, 90, 95]
-    const fprs = [5, 8, 10, 12]
-    const populations = [10000, 20000, 50000]
-
-    const baseRatePercent = rng.pick(baseRates)
-    const sensitivityPercent = rng.pick(sensitivities)
-    const falsePositiveRatePercent = rng.pick(fprs)
-    const population = rng.pick(populations)
+    const baseRatePercent = rng.int(1, 20)
+    const sensitivityPercent = rng.int(70, 99)
+    const falsePositiveRatePercent = rng.int(1, 20)
+    const population = rng.int(1, 5) * 10000
 
     const params: BaseRateScreeningParams = {
       level,
@@ -200,7 +197,7 @@ export const baseRateScreeningTemplate: Template<BaseRateScreeningParams> = {
     }
 
     if (level === 3) {
-      params.distractingPercent = rng.pick([65, 72, 80, 85])
+      params.distractingPercent = rng.int(65, 85)
     }
 
     if (level === 4) {
@@ -431,6 +428,9 @@ export const baseRateScreeningTemplate: Template<BaseRateScreeningParams> = {
       }
     }
 
+    if (p.level === 4) {
+      blocks.unshift({ t: 'note', text: 'Assume the two test results are conditionally independent within true cases and within non-cases.' })
+    }
     return blocks
   },
 
@@ -458,13 +458,20 @@ export const baseRateScreeningTemplate: Template<BaseRateScreeningParams> = {
   steps,
 
   solution(p: BaseRateScreeningParams): Block[] {
-    const tpRate = (p.baseRatePercent / 100) * (p.sensitivityPercent / 100)
-    const fpRate =
+    let tpRate = (p.baseRatePercent / 100) * (p.sensitivityPercent / 100)
+    let fpRate =
       (1 - p.baseRatePercent / 100) * (p.falsePositiveRatePercent / 100)
+    const secondStage: Block[] = []
+    if (p.level === 4) {
+      tpRate *= (p.stage2SensitivityPercent ?? 90) / 100
+      fpRate *= (p.stage2FalsePositiveRatePercent ?? 10) / 100
+      secondStage.push({ t: 'p', text: `For both tests to be positive, multiply the first-test true-positive rate by ${p.stage2SensitivityPercent}% and the first-test false-positive rate by ${p.stage2FalsePositiveRatePercent}%. Use the resulting counts positive on both tests in the ratio below.` })
+    }
     const totalPosRate = tpRate + fpRate
     const finalPct = (tpRate / totalPosRate) * 100
 
     return [
+      ...secondStage,
       {
         t: 'p',
         text: `Consider a sample population of 10,000 items:`,
@@ -475,25 +482,17 @@ export const baseRateScreeningTemplate: Template<BaseRateScreeningParams> = {
           `True cases = 10,000 × ${p.baseRatePercent}% = ${Math.round(
             10000 * (p.baseRatePercent / 100),
           )}`,
-          `True positives flagged = ${Math.round(
-            10000 * (p.baseRatePercent / 100),
-          )} × ${p.sensitivityPercent}% = ${Math.round(10000 * tpRate)}`,
+          `True cases positive ${p.level === 4 ? 'on both tests' : 'on the test'} = 10,000 × ${p.baseRatePercent}% × ${p.sensitivityPercent}%${p.level === 4 ? ` × ${p.stage2SensitivityPercent}%` : ''} = ${(10000 * tpRate).toFixed(2)}`,
           `Non-cases = 10,000 × ${100 - p.baseRatePercent}% = ${Math.round(
             10000 * (1 - p.baseRatePercent / 100),
           )}`,
-          `False alarms flagged = ${Math.round(
-            10000 * (1 - p.baseRatePercent / 100),
-          )} × ${p.falsePositiveRatePercent}% = ${Math.round(10000 * fpRate)}`,
-          `Total flagged = ${Math.round(10000 * tpRate)} + ${Math.round(
-            10000 * fpRate,
-          )} = ${Math.round(10000 * totalPosRate)}`,
+          `Non-cases positive ${p.level === 4 ? 'on both tests' : 'on the test'} = 10,000 × ${100 - p.baseRatePercent}% × ${p.falsePositiveRatePercent}%${p.level === 4 ? ` × ${p.stage2FalsePositiveRatePercent}%` : ''} = ${(10000 * fpRate).toFixed(2)}`,
+          `Total flagged = ${(10000 * tpRate).toFixed(2)} + ${(10000 * fpRate).toFixed(2)} = ${(10000 * totalPosRate).toFixed(2)}`,
         ],
       },
       {
         t: 'p',
-        text: `The probability that a flagged item is a true case is ${Math.round(
-          10000 * tpRate,
-        )} / ${Math.round(10000 * totalPosRate)} ≈ ${finalPct.toFixed(2)}%.`,
+        text: `The probability that a flagged item is a true case is ${(10000 * tpRate).toFixed(2)} / ${(10000 * totalPosRate).toFixed(2)} ≈ ${finalPct.toFixed(2)}%.`,
       },
     ]
   },

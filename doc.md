@@ -96,6 +96,8 @@ Every concept has a **concept card**: a short authored explanation, one worked e
 
 The visual direction is calm, adult, and precise: generous working space, readable type, restrained colour, and title colours as the main accent. Difficulty comes from the reasoning, not from speed, tiny controls, or clutter.
 
+Correct answers, including tutorial and repair questions, get a short original chime and a restrained confetti burst, only after grading resolves. Sound and celebrations can each be disabled in Settings. Reduced motion suppresses confetti. Opening an old result never replays a celebration. The signed-out sample uses the same feedback, with browser controls in Cookie settings.
+
 ### 4.2 One problem
 
 ```mermaid
@@ -156,6 +158,8 @@ Placement means the first 8 rated problems in a track, chosen at a 50% target. T
 | `multi` | A subset of options (for example, Wason cards or knights). | Exact set equality. |
 | `sequence` | An ordering of labelled items (keyboard reorder controls; drag is optional). | Exact order. |
 | `code` | Source in Python 3, C++17, or JavaScript (Node). | All hidden tests pass within limits (§8). |
+
+Authored prompts may include local bar or line graphs, with labelled axes, units, a zero baseline and a visible equivalent data table. Graphs contain givens only; answers and correctness cues remain server-side until resolution.
 
 Parse errors are shown before commit and never count as wrong answers. Choice items need at least 6 options, or a combined outcome space of at least 6, so guessing rarely succeeds (the model has no guessing parameter; §6.10).
 
@@ -308,7 +312,7 @@ A template is a reviewed TypeScript module that turns `(level, seed, skin)` into
 | `sample(rng, level)` | Draws parameters satisfying the constraints; deterministic for a given seed. |
 | `solve(params)` | The canonical answer. |
 | `verify(params, rng)` | An **independent** computation (Monte Carlo simulation, brute-force enumeration, or a different formula) that must agree with `solve`. |
-| `render(params, skin)` | Prompt as structured blocks (paragraph, table, list, code, note). Plain text only; no HTML or Markdown execution. |
+| `render(params, skin)` | Prompt as structured blocks (paragraph, table, list, code, note, given-data chart or schematic diagram). Visuals have visible text equivalents; schematic layout must not encode unknown quantities. Plain text only; no HTML or Markdown execution. |
 | `answer` | Answer type, unit, and tolerance. |
 | `misconceptions` | `{ id, value(params), feedback }`: values a known wrong method produces. |
 | `steps` | The repair ladder: `{ prompt, answer(params), tolerance, explain }`. |
@@ -396,7 +400,7 @@ Content is the critical path. Two reference templates and two reference code pro
 
 ### 9.2 Public profiles
 
-A public profile shows handle, join date, ratings, titles, rating graph, calibration badge, and proven-concept count. It never shows answers, confidence values, playbook entries, or code. Learners who hide themselves from leaderboards also get a private profile.
+A public profile shows handle, optional display name and photo, join date, ratings, titles, rating graph, calibration badge, and proven-concept count. It never shows answers, confidence values, playbook entries, or code. Learners who hide themselves from leaderboards also get a private profile. Settings lets a learner change their display name, upload or remove a photo, and change their handle under the existing 30-day rule. Photos are cropped to 256 × 256 JPEGs, at most 90,000 data-URL characters, with source metadata discarded; no external image URLs are used.
 
 ### 9.3 Honest competition without surveillance
 
@@ -474,6 +478,7 @@ Two tabs or a double click cannot produce two first commits. A failed transactio
 
 - Private by default: attempts, answers, confidence, playbook, and code are visible only to their owner (and to admins for moderation, which is logged).
 - No third-party analytics, ads, or session replay. Product metrics come from Eleanor's own database.
+- Cookie settings offer equally accessible essential-only and optional-preference choices. A first-party consent cookie remembers that choice for 180 days; the optional cookie remembers signed-out sound/celebration preferences only after acceptance and is removed on withdrawal. Sign-in remains in Supabase's existing local storage; signed-in settings remain in the profile. Blocked storage never prevents practice.
 - **Export:** a JSON file with the profile, ratings, attempts, playbook, and submissions.
 - **Delete account:** removes the profile and all personal rows (cascade) and the auth user. Item ratings keep their aggregate statistical updates; this is disclosed.
 - Age gate: the learner confirms they are 16 or older; any report of an under-16 account leads to deletion.

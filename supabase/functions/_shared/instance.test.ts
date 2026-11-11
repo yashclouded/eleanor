@@ -31,9 +31,9 @@ describe('itemId and registry', () => {
 
 describe('base-rate screening template instance', () => {
   it('level-2 factory fixture (1%, 90%, 10%) gives answer ~8.333% and misconceptions 90 and 100', () => {
-    // Seed 35 samples baseRate: 1%, sensitivity: 90%, FPR: 10%
-    const seed = 35
-    const instance = buildInstance(baseRateScreeningTemplate, 2, seed, 'factory')
+    const fixture = { ...baseRateScreeningTemplate, sample: () => ({ level: 2, population: 10000,
+      baseRatePercent: 1, sensitivityPercent: 90, falsePositiveRatePercent: 10 }) }
+    const instance = buildInstance(fixture, 2, 35, 'factory')
 
     expect(instance.skin).toBe('factory')
     expect(typeof instance.secret.answer).toBe('number')

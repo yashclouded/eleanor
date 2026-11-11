@@ -8,12 +8,11 @@ import { PromptBlocks } from '../components/PromptBlocks.tsx'
 import { AnswerInput } from '../components/AnswerInput.tsx'
 import { ConfidenceInput } from '../components/ConfidenceInput.tsx'
 import { ResultPanel } from '../components/ResultPanel.tsx'
+import { useAnswerFeedback } from '../components/Experience.tsx'
 import { RepairLadder, type RepairStepData } from '../components/RepairLadder.tsx'
 import { Reveal } from '../components/Reveal.tsx'
 import { InsightInput } from '../components/InsightInput.tsx'
 import { useAuth } from '../lib/auth.tsx'
-import { useOutcomeSound } from '../lib/useOutcomeSound.ts'
-import { prepareSound } from '../lib/feedback.ts'
 
 interface DailyStats {
   number: number
@@ -31,13 +30,13 @@ interface DailyStats {
 }
 
 export function Daily() {
+  const feedback = useAnswerFeedback()
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [initError, setInitError] = useState<string | null>(null)
 
   const [dailyNumber, setDailyNumber] = useState<number | null>(null)
   const [attempt, setAttempt] = useState<AttemptView | null>(null)
-  useOutcomeSound(attempt)
   const [stats, setStats] = useState<DailyStats | null>(null)
 
   // Draft inputs
@@ -141,7 +140,8 @@ export function Daily() {
     if (!attempt || draftConfidence === null) return
     const parsed = parseAnswer(attempt.answerSpec, draftAnswer)
     if (!parsed.ok) return
-    void prepareSound()
+
+    feedback.prepare()
 
     try {
       const res = await commitAction.run({
@@ -150,6 +150,7 @@ export function Daily() {
         declaredHelp,
       })
 
+      feedback.celebrate(attempt.id, res.outcome === 'correct')
       // Update attempt to resolved state
       setAttempt((prev) => {
         if (!prev) return null
@@ -177,7 +178,6 @@ export function Daily() {
   const handleConfirmGiveUp = async () => {
     setShowGiveUpConfirm(false)
     if (!attempt) return
-    void prepareSound()
 
     try {
       const res = await giveUpAction.run({})

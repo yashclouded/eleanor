@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type User } from '@supabase/supabase-js'
 
 async function makeAdmin(email: string) {
   const supabaseUrl =
@@ -6,22 +6,23 @@ async function makeAdmin(email: string) {
   const serviceKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SECRET_KEY ||
-    'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz'
+    (['127.0.0.1', 'localhost', '[::1]'].includes(new URL(supabaseUrl).hostname)
+      ? 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz' : '')
+  if (!serviceKey) throw new Error('Set SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY for a remote project')
 
   const supabase = createClient(supabaseUrl, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  const { data, error } = await supabase.auth.admin.listUsers()
-  if (error) {
-    console.error('Failed to list users:', error.message)
-    process.exit(1)
+  let user: User | undefined
+  for (let page = 1; ; page++) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 200 })
+    if (error) throw new Error(`Failed to list users: ${error.message}`)
+    user = data.users.find((candidate) => candidate.email?.toLowerCase() === email.toLowerCase())
+    if (user || data.users.length < 200) break
   }
-
-  const user = data.users.find((u) => u.email?.toLowerCase() === email.toLowerCase())
   if (!user) {
-    console.error(`User with email "${email}" not found.`)
-    process.exit(1)
+    throw new Error(`User with email "${email}" not found.`)
   }
 
   const { data: updated, error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
@@ -32,8 +33,7 @@ async function makeAdmin(email: string) {
   })
 
   if (updateError) {
-    console.error('Failed to update user role:', updateError.message)
-    process.exit(1)
+    throw new Error(`Failed to update user role: ${updateError.message}`)
   }
 
   console.log(`Success: user ${updated.user.email} (${updated.user.id}) has been granted admin role.`)

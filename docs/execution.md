@@ -10,7 +10,7 @@
 
 **Spec:** [doc.md](../doc.md). Read it before any task. Section references such as `§6.2` point there. Evidence and caveats: [research.md](research.md).
 
-**Status (20 October 2026): nothing in this plan has been implemented.** Commands named here do not exist until the task that creates them is done.
+**Status (11 November 2026): the core local implementation is present.** Task 4.7 tracks the owner-requested experience additions. Human content/legal review, the calibration beta and production launch remain release gates; local test fixtures are not published launch content.
 
 ### How to use this document
 
@@ -462,6 +462,7 @@ export function templateFor(itemId: string): { template: Template<any>; level: n
 - the last numeric step equals the answer;
 - `render` blocks are non-empty for every skin;
 - at least 50 distinct parameter JSONs per 1,000 seeds.
+- at least 50 distinct visible first-skin prompts over those seeds; unused parameters do not establish visible diversity.
 
 Bank-level checks:
 
@@ -1360,6 +1361,23 @@ Implement, run, paste output. Commit: "feat(web): settings, landing and legal dr
 
 ---
 
+### Task 4.7: Complete the MVP experience
+
+Owner request (11 November 2026): retain the visual direction while completing answer feedback, cookie choices and editable profiles. Reuse existing flows; no additional dependencies or trackers.
+
+- Share an original Web Audio success chime and brief confetti across fresh correct set, code, Daily, sample, tutorial and repair answers. Never celebrate failures, errors or loaded results. Respect sound/celebration preferences and reduced motion; audio failures cannot interrupt an attempt.
+- Add accessible cookie controls on every route: essential-only or optional preferences, reversible from Cookie settings. Persist no optional cookie before consent. Clearly describe actual cookies and auth storage.
+- Add nullable `display_name` (1–60 trimmed characters) and `avatar_data_url` (bounded JPEG only) to profiles, plus boolean `sound_enabled` and `celebrations_enabled` defaults. Extend existing column grants and public-profile output without changing profile visibility. Photos must be cropped/re-encoded locally before saving. Include names/photos in export and cascade deletion through the existing profile row.
+- Keep handle validation consistent with the existing server contract (`[a-z0-9_]{3,20}`). Surface loading, save/error states and account-edit links; retain all release gates.
+- Let a learner explicitly use a displayed ordering answer without moving items unnecessarily. Refresh the private leaderboard materialized view after account deletion, matching migration 0007.
+
+Done when:
+
+- [x] New tests fail first, then pass for consent/withdrawal, success-only feedback, mute/reduced motion, photo validation and profile persistence/privacy.
+- [x] `npm run check && npm test && npm run build` pass: 38 files / 373 tests, main JavaScript 180.15 KB gzip.
+- [x] Local migration 0008 applied; database 35 checks, API 70 tests, full Chromium suite 46 tests, and 11 follow-up form/experience tests pass.
+- [x] Remaining content review, legal, beta and deployment gates recorded in [the verification report](mvp-experience.md); production is not marked launched.
+
 ## Phase 5: Coding track
 
 ### Task 5.1: Code problem format and local verification
@@ -1531,7 +1549,51 @@ Write a concept card (Block[]) for every concept in catalog.ts, status draft. Ea
 
 ### Task 6.2: Judgment templates (14)
 
-Run the authoring prompt with `<TRACK>` = Judgment, for:
+#### Judgment depth expansion (owner request, 9 November 2026)
+
+Expand all nine existing Judgment concepts before expanding the other tracks. Audit and improve every existing Judgment template; add separate foundation and advanced templates per concept. Keep existing item IDs, versions, historical instances and ERM-1 unchanged. New templates remain drafts with no reviewer. Difficulty estimates are provisional until human review and calibration.
+
+- Target at least 1,100,000 distinct visible prompts across the Judgment bank, measured by a reproducible capacity audit. This exceeds ten years at one question every five minutes continuously (365.25 days/year). Count prompt contents globally, with one fixed skin per template; do not count unused parameters, answers, template IDs or extra skins as new questions. This is bank capacity, not a promise of duplicate-free delivery or empirically measured difficulty.
+- Foundations start at rating 400–600; advanced ladders reach at least 2600. Each level adds a reasoning demand, with small, comprehensible quantities at entry levels. Preserve the 3–6 levels per template contract by introducing separate ladders.
+- Research each topic from primary research or authoritative university/textbook material; record sources, assumptions, misconceptions, progression and limitations in `docs/judgment-research.md`. Author original problems rather than copying published exercises.
+- Permit an authored `chart` prompt block for bar and line plots, containing a title, labelled axes, units and finite non-negative source data. Render locally without dependencies or remote images, with a visible equivalent data table. Visuals present only question data and never computed answers or correctness cues. Update the block renderer, word counter and Markdown review preview together.
+- Add tests first for inventory, progression, determinism, independent verification and meaningful visual representation. Run `npm run check`, `npm test`, `npm run content:check`, the capacity audit, and produce review previews for every Judgment template. Publication remains a human gate; do not mark that gate complete.
+
+Scope: Judgment template modules and registry, their tests, chart block types/rendering/preview/checking, research and review inventory. No learner-model, selection, API, database, Logic, Math or Code changes in this content expansion.
+
+Author verification, 9 November 2026:
+
+- [x] All 14 existing templates audited; 18 new templates cover nine foundation and nine advanced ladders. Judgment now has 32 templates and 145 levels, estimated ratings 400–2700.
+- [x] `npm run check`: exit 0 (TypeScript, ESLint, Deno).
+- [x] `npm test`: 26 files passed, 239 tests passed.
+- [x] `npm run content:check`: 56 templates, 45 code problems and 34 cards passed the full checker.
+- [x] `npm run content:capacity:judgment`: 1,597,763 distinct prompts from 1,600,000 draws; 15.19 continuous years at five minutes each. Counts only 32 advanced levels, excluding foundation/original templates and four advanced levels with ancillary distractors. See the research note and generated capacity report for method and exclusions.
+- [x] `npm run build`: exit 0. Existing large-chunk warning remains; main JavaScript gzip is 175.58 kB.
+- [x] Generated all 32 Judgment Markdown previews and `build/review/judgment-visuals.html`; checked five graphs and equivalent tables in Chromium, with zero automated axe WCAG A/AA findings and no page overflow at 390px. This does not replace a full assistive-technology review.
+- [ ] 🔒 Independent human wording, pedagogy and level-order review; calibrated difficulty; publication. All content remains draft.
+
+#### Judgment structural variety (owner follow-up, 9 November 2026)
+
+The depth expansion's 32 Judgment templates use numeric/estimate responses. Add 18 new, distinct families (two per concept), bringing the bank to 50 templates. Research the mechanisms and document original question structures in `docs/judgment-variety.md`. Variety means a different decision/inference task, not a new skin, bigger parameter range or answer-format conversion of an existing calculation.
+
+- Cover sampling/design critique, population estimation, reporting/selection protocols, inverse models, operating-point decisions, pairwise versus mutual independence, comparing architectures, causal/control contrasts, minimax regret, stopping decisions, dominance and evidence provenance/coherence.
+- Use the existing response components: at least four new choice families, three multi-select families and two ordering families, alongside new numerical/estimation tasks. Choice has at least six plausible options; multi has at least six possible combined outcomes; sequences have at least six items and unambiguous ordering. Vary option position and correct selections, with no correctness-bearing option IDs or metadata.
+- Each template has 3–6 meaningful difficulty levels, two contexts, constrained reproducible sampling, independent verification, task-specific misconceptions and a 3–5 step numeric repair ladder. Non-numeric solutions explicitly name and explain the correct selection/order. All remain drafts with null reviewer fields. Use graphs only for given data, with existing accessible chart/table rendering.
+- Add failing tests first for family/format inventory, hand-computed fixtures, canonical answer validity, determinism, per-level meaningful variation and order-sensitive sequence verification. Keep all existing items and learner-model, selection, grading, API and database behavior unchanged. Fix the content checker if required to validate the newly used answer formats correctly.
+- Run `npm run check`, `npm test`, `npm run content:check`, `npm run build`, and the existing capacity gate. Generate review previews for all added templates, plus a mixed-format review gallery using the existing renderer and answer inputs; verify keyboard controls and accessible rendering. Update the human-review inventory and record actual results. Human publication remains pending.
+
+Author verification, 10 November 2026:
+
+- [x] Added 18 families across all nine concepts: five choice, four multi-select, three sequence and six numerical templates. Judgment now has 50 templates, 207 levels and 50 families.
+- [x] `npm run check`: exit 0; `npm test`: 31 files and 300 tests passed.
+- [x] `npm run content:check`: 74 templates, 45 code problems and 34 cards passed; 2,000 seeds per template level. Exact ordering and canonical option membership are checked through the existing grader/parser.
+- [x] `npm run content:capacity:judgment`: unchanged conservative lower bound of 1,597,763 prompts (15.19 continuous years at five minutes each). New variety families do not inflate this audit.
+- [x] `npm run build`: exit 0; existing chunk-size warning remains.
+- [x] Regenerated all 50 Judgment previews, including actual choice labels and initial sequence order. Built `build/review/judgment-variety.html` with 18 interactive public examples and no solutions.
+- [x] Chromium: radio/checkbox Space interactions and ranking Enter interaction passed; zero automated axe WCAG A/AA findings; no page overflow or clipped controls at 390px. Independent review found and verified fixes for question validity, numeric boundaries, misconception matching and option-pattern shortcuts.
+- [ ] 🔒 Human wording/pedagogy review, calibrated difficulty, learner engagement/transfer evaluation and publication. Content remains draft; selection and API/account journeys were not changed.
+
+Original Task 6.2 inventory (run the authoring prompt with `<TRACK>` = Judgment):
 
 - `frequencies.counting-table`
 - `estimation.fermi-quantity` (an `estimate` answer, log tolerance 0.3)
@@ -1595,6 +1657,23 @@ passed (38 templates, 2 code problems, 34 cards). All 12 `content:preview`
 commands passed; preview paths are linked in `content/REVIEW.md`.
 🔒 Human content review and publication remain pending.
 
+#### Owner follow-up: Math depth and structural variety
+
+The owner requested the same expansion for the third track, Math, while another agent handles Logic.
+
+- Preserve the original 12 templates; add four distinct mechanisms per Math concept: a six-level foundation ladder (400–1400), a four-level advanced ladder (1800–2700), and two varied task families. The resulting bank has 44 templates across all eight concepts. These ratings are provisional, not a claim of calibrated Olympiad equivalence.
+- Research primary teaching and competition sources; author original questions. Harder levels add constraints, inverse reasoning, cases or proof ideas rather than only larger numbers. Include single selection, multiple selection and ordering alongside numeric answers.
+- Add accessible local geometry diagrams with text equivalents. Diagram layout is schematic and must not encode an unknown length or answer. Use existing charts for given data.
+- Measure at least 1,100,000 globally distinct visible prompts using one fixed skin and meaningful advanced givens. Exclude ancillary distractors from the capacity claim. Ten years means continuous solving at five minutes per question; capacity does not establish a duplicate-free delivery guarantee or freedom from boredom.
+- Keep every template draft with null reviewer fields. Produce review previews, a research/family map and an interactive review gallery. Human review and publication remain owner gates.
+
+Done when:
+
+- [x] Tests first for new generators, visual validation/rendering and capacity accounting; failing runs and fixes recorded during implementation.
+- [x] `npm run check && npm test && npm run content:check && npm run build` pass: 37 test files / 371 tests; 106 templates, 45 code problems and 34 cards verified (11 November 2026).
+- [x] `npm run content:capacity:math`: 1,583,810 distinct advanced prompts from 1,600,000 draws; 15.06 continuous years at five minutes each.
+- [x] All 44 Math previews and [the family map](math-research.md) are ready. Gallery keyboard/Axe checks pass, with no overflow at 320/390 pixels; 30 sampled geometry layouts have no overlapping labels. Human review/publication remain pending.
+
 ### Task 6.5: Code problems (45)
 
 ```text
@@ -1646,12 +1725,6 @@ List at least 60 (template, level) pairs from dailyLevels across Judgment, Logic
 
 **Routes:** these require `isAdmin`; otherwise → 403.
 
-All admin mutations also require a UUID `transitionId` and a trimmed `reason`
-of 5–1000 characters. They use the existing transaction/transition helper, so a
-retry records one action. Item anchoring stores `items.anchored_at` plus the
-frozen rating and RD in the audit note. Unrating and retirement mark the audit
-record's `params.replayPending = true` for task 7.2; neither deletes history.
-
 - `GET /admin/model-health?days=30` returns the model's Brier score, log loss, and reliability bins (from `attempts.forecast` against outcomes on rated attempts), plus per-track counts. It also returns drift: the weekly mean rating of learners with more than 100 rated attempts, and the weekly mean residual on anchor items.
 - `GET /admin/items?flagged=1` lists items with n ≥ 50 and |mean(s − E)| > 0.15 over their item rating events, plus counts.
 - `POST /admin/items/:id/retire` with `{ reason }` sets the item to retired and records a moderation action (`note`).
@@ -1674,31 +1747,8 @@ Implement, run, paste output. Commit: "feat(admin): model health, item flags and
 
 **Done when:**
 
-- [x] The tests pass.
-- [x] `make-admin` plus a fresh sign-in reaches `/admin`.
-
-Verification (1 November 2026):
-
-```text
-npm run test:api -- tests/api/admin.test.ts
-Test Files  1 passed (1)
-Tests  11 passed (11)
-
-npm run test:e2e -- tests/e2e/admin.spec.ts --config /private/tmp/eleanor-playwright-admin.config.ts
-2 passed (5.6s)
-
-npm run check && npm test
-Test Files  13 passed (13)
-Tests  98 passed (98)
-```
-
-The API tests exercise the router against local Postgres with rolled-back
-fixtures, including diagnostic grants, drift, privacy, and idempotent moderation.
-The browser tests run `make-admin`, obtain a fresh real Supabase session, check
-keyboard moderation and axe accessibility, and deny a non-admin session. Their
-diagnostic and moderation HTTP responses are mocked. The temporary Playwright
-config uses port 5177 to avoid other agents' dev servers; the committed test also
-runs with the normal Playwright config.
+- [ ] The tests pass.
+- [ ] `make-admin` plus a fresh sign-in reaches `/admin`.
 
 ### Task 7.2: Integrity flags and deterministic replay
 
@@ -1713,13 +1763,12 @@ runs with the normal Playwright config.
 **Replay (`npm run model:replay -- [--apply]`):**
 
 - It reads every attempt with `rated = true` whose item is not retired, ordered by `(resolved_at, id)`.
-- It starts every learner and concept from the model's start values, and every item from `initialRating` with rd 250. Anchors are re-frozen at `items.anchored_at`, using the matching admin audit note's frozen rating and RD. Legacy anchors without an audit note use their current stored values.
+- It starts every learner and concept from the model's start values, and every item from `initialRating` with rd 250. Anchors are re-frozen at their current values once replay passes the timestamp at which they were anchored.
 - It recomputes with `applyResponse` into in-memory maps and prints:
   - learners whose track rating changes by more than 25;
   - the 20 largest item changes;
   - the overall mean shift.
 - With `--apply`, inside one transaction it rewrites `track_ratings`, `concept_ratings`, item ratings, and `rating_events` (deletes, then reinserts, with a `model_version` suffix `+replay-<date>`), then refreshes the leaderboard.
-- A successful apply sets `params.replayPending = false` on pending unrate and retirement audit records in that same transaction. Dry runs and failed applies preserve pending markers and the rest of each audit record.
 - Without `--apply` it is read-only.
 - It refuses `--apply` against production unless `--confirm-production` is passed. 🔒 The owner runs that.
 
@@ -1735,9 +1784,7 @@ Implement, run, paste output. Commit: "feat(integrity): review flags and determi
 
 **Done when:**
 
-- [x] The determinism test passes (replay equals live within 1e-9; `npm run test:replay`, 11 tests passed, including audited anchors and pending replay completion).
-
-Verification: `npm run test:api -- tests/api/integrity.test.ts tests/api/admin.test.ts` and `npm run check && npm test`. Production `--apply --confirm-production` remains an owner gate.
+- [ ] The determinism test passes (replay equals live).
 
 ---
 
@@ -1756,7 +1803,7 @@ Paste the full CI-equivalent local run. Commit: "test: end-to-end journey, acces
 
 **Done when:**
 
-- [x] CI is green on [pull request #1](https://github.com/yashclouded/eleanor/pull/1): [successful run 41465504264](https://github.com/yashclouded/eleanor/actions/runs/41465504264).
+- [ ] CI is green on a pull request (link it).
 
 ### Task 8.2: Security and performance review
 
@@ -1764,10 +1811,10 @@ Paste the full CI-equivalent local run. Commit: "test: end-to-end journey, acces
 You are implementing Task 8.2 of the Eleanor MVP: a security and performance review. Do not add features.
 Check and fix (with a test for each fix):
 1. RLS: run supabase db lint and the Supabase security advisor (CLI or dashboard; follow current docs) and fix every warning. Re-run test:db.
-2. The api accepts only APP_ORIGIN for CORS; every JSON body is byte-capped (64 KiB code, 8 KiB otherwise; oversized requests return 413); resource and transition IDs are validated as UUIDs, except registry item IDs, which use versioned content keys; every route checks user ownership in SQL.
+2. The api accepts only APP_ORIGIN for CORS; every body is size-capped (64 KB code, 8 KB otherwise); every id is validated as a uuid; every route checks user ownership in SQL.
 3. Rate limits: sets created ≤ 30/hour, commits ≤ 300/hour, code runs (already done), reports (done), all via rate_events; return 429.
 4. There are no secrets in the client bundle: grep dist/ for 'sb_secret', 'service_role' and the Judge0 host and token.
-5. Static host headers: CSP default-src 'self'; connect-src 'self' plus the configured Supabase origin; img-src 'self' data:; style-src 'self' 'unsafe-inline' (required by existing React inline styles and CodeMirror's generated styles); frame-ancestors 'none'. Also Referrer-Policy no-referrer and Permissions-Policy denying unused browser capabilities, with clipboard-write=(self) and web-share=(self) to preserve explicit Daily sharing and code-copy actions. Generate Netlify-compatible _headers and _redirects from the build configuration, with an SPA fallback rewrite. No inline scripts or eval are permitted.
+5. Static host headers: CSP default-src 'self'; connect-src 'self' https://<project>.supabase.co; img-src 'self' data:; style-src 'self' 'unsafe-inline' (only if CodeMirror requires it; check); frame-ancestors 'none'. Also Referrer-Policy no-referrer and Permissions-Policy with every permission denied. Write them for the chosen host (vercel.json, _headers or similar) with an SPA fallback rewrite.
 6. Performance: a 300-attempt user loads Progress in < 1.5 s locally; EXPLAIN the selection-input queries and add missing indexes; the bundle gzip size is < 250 KB for the main chunk (lazy-load CodeMirror and Admin).
 7. Run npm audit --omit=dev and resolve high/critical issues.
 Report findings with evidence. Commit: "chore(security): hardening pass".
@@ -1775,8 +1822,8 @@ Report findings with evidence. Commit: "chore(security): hardening pass".
 
 **Done when:**
 
-- [x] Every item above has evidence pasted in [docs/security-review.md](security-review.md).
-- [x] No high or critical findings remain.
+- [ ] Every item above has evidence pasted.
+- [ ] No high or critical findings remain.
 
 ### Task 8.3: Closed calibration beta 🔒
 

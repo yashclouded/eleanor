@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { BrandMark, Icon } from '../components/Icon.tsx'
+import { TrackArt } from '../components/TrackArt.tsx'
 import { supabase } from '../lib/supabase.ts'
-import { Icon } from '../components/Icon.tsx'
-import { ReasoningArt } from '../components/ReasoningArt.tsx'
 
 export function Login() {
   const [email, setEmail] = useState('')
@@ -59,104 +60,30 @@ export function Login() {
   }
 
   return (
-    <div className="login-layout container-dashboard">
-      <aside className="login-intro">
-        <p className="eyebrow">A MOMENT FOR YOUR MIND</p>
-        <p className="login-statement">A quiet place.<br /><em>A clearer perspective.</em></p>
-        <ReasoningArt />
-        <p className="login-intro-note">Judgment. Logic. Math. Code.<br />Four ways to practise thinking for yourself.</p>
-      </aside>
-      <div className="form-card login-card">
-        <span className="login-symbol"><Icon name={sent ? 'mail' : 'compass'} size={30} /></span>
+    <div className="login-layout">
+      <aside className="login-story" aria-label="The Eleanor practice"><span className="eyebrow">A LITTLE FURTHER, EVERY DAY</span><h2>Good things<br />take a little<br />thinking.</h2><TrackArt track="judgment" /><p>A daily practice in judgment, logic, math, and code. Your own thinking comes first.</p></aside>
+      <div className="login-form">
         {sent ? (
-          <div data-testid="check-email-state">
-            <h1 style={{ fontSize: '1.5rem', marginBottom: 'var(--space-2)' }}>
-              Check your email
-            </h1>
-            <p style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-6)' }}>
-              We sent a sign-in link to <strong>{email}</strong>. Click the link in your email to sign in to Eleanor.
-            </p>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => {
-                setSent(false)
-                setEmail('')
-              }}
-            >
-              Use a different email
-            </button>
+          <div data-testid="check-email-state" role="status">
+            <div className="email-sent-icon"><Icon name="mail" /></div>
+            <h1>Check your email</h1>
+            <p className="login-description">We sent a sign-in link to <strong>{email}</strong>. Click the link in your email to sign in to Eleanor.</p>
+            <button type="button" className="btn btn-secondary" onClick={() => { setSent(false); setEmail('') }}>Use a different email</button>
           </div>
         ) : (
-          <div>
-            <h1 style={{ fontSize: '1.5rem', marginBottom: 'var(--space-2)' }}>
-              Sign in to Eleanor
-            </h1>
-            <p style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-6)' }}>
-              Enter your email to receive a passwordless sign-in link.
-            </p>
-
-            {error && (
-              <div className="alert alert-error" role="alert">
-                {error}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} noValidate>
-              <div className="form-group">
-                <label htmlFor="email" className="form-label">
-                  Email address
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  className={`form-input ${error ? 'is-error' : ''}`}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  disabled={loading}
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-primary btn-full"
-                disabled={loading || !email}
-              >
-                {loading ? 'Sending link...' : 'Send magic link'} <Icon name="arrow" size={18} />
-              </button>
+          <>
+            <BrandMark /><h1>Make space to think.</h1>
+            <p className="login-description">Welcome to Eleanor. Enter your email to sign in or begin your practice. No password to remember.</p>
+            {error && <div className="alert alert-error" role="alert" id="login-error">{error}</div>}
+            <form onSubmit={handleSubmit} noValidate aria-label="Sign in to Eleanor">
+              <div className="form-group"><label htmlFor="email" className="form-label">Email address</label><input id="email" name="email" type="email" autoComplete="email" required className={`form-input ${error ? 'is-error' : ''}`} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" disabled={loading} aria-invalid={!!error} aria-describedby={error ? 'login-error' : undefined} /></div>
+              <button type="submit" className="btn btn-primary btn-full" disabled={loading || !email}>{loading ? 'Sending link...' : 'Send magic link'}<Icon name="arrow" /></button>
             </form>
-
-            {isGoogleEnabled && (
-              <div style={{ marginTop: 'var(--space-6)' }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    margin: 'var(--space-4) 0',
-                    color: 'var(--text-muted)',
-                    fontSize: '0.875rem',
-                  }}
-                >
-                  <hr style={{ flex: 1, borderColor: 'var(--border)' }} />
-                  <span style={{ padding: '0 var(--space-3)' }}>or</span>
-                  <hr style={{ flex: 1, borderColor: 'var(--border)' }} />
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-full"
-                  onClick={handleGoogleSignIn}
-                >
-                  Continue with Google
-                </button>
-              </div>
-            )}
-          </div>
+            {isGoogleEnabled && <div className="google-sign-in"><span>or</span><button type="button" className="btn btn-secondary btn-full" onClick={handleGoogleSignIn}>Continue with Google</button></div>}
+            <p className="login-privacy"><Icon name="check" />Private by choice. Always your own thinking.</p>
+          </>
         )}
-        <p className="login-footnote"><Icon name="shield" size={15} /> Passwordless sign-in. A space of your own.</p>
+        <Link to="/" className="text-link login-back">Back to Eleanor</Link>
       </div>
     </div>
   )

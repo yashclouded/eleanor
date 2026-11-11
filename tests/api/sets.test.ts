@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest'
-import { call, createTestUser, testSql } from './helpers.ts'
+import { answerInput, call, createTestUser, testSql } from './helpers.ts'
 
 describe('API: Sets and next problem', () => {
   afterAll(async () => {
@@ -270,13 +270,13 @@ describe('API: Sets and next problem', () => {
           `/attempts/${attempt.id}/commit`,
           {
             transitionId: crypto.randomUUID(),
-            answer: String(sec.answer),
+            answer: answerInput(sec.answer),
             confidence: 0.9,
             declaredHelp: false,
           },
           user.token
         )
-        expect(commitRes.status).toBe(200)
+        expect(commitRes.status, JSON.stringify({ response: commitRes.data, spec: attempt.answerSpec, answer: sec.answer })).toBe(200)
         expect(commitRes.data.ok).toBe(true)
       }
 

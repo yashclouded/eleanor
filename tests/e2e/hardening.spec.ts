@@ -8,6 +8,8 @@ import postgres from 'postgres'
 import { adminClient, createTestUser, createUserClient, SUPABASE_URL } from '../api/helpers.ts'
 import { loadSelectionInput } from '../../supabase/functions/api/load.ts'
 
+declare global { interface Window { toneCount: number } }
+
 const testSql = postgres(process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres', { prepare: false, max: 2 })
 
 let server: Server, origin: string, userId: string
@@ -125,8 +127,8 @@ test('explicit win sounds and lazy CodeMirror work under shipped headers', async
     AudioContext.prototype.createOscillator = function () { window.toneCount++; return oscillator.call(this) }
   })
   await page.goto(origin)
-  await page.getByRole('button', { name: 'Sound effects', exact: true }).click()
-  await page.getByTestId('answer-input').fill('8.3')
+  await page.getByRole('button', { name: 'Essential only', exact: true }).click()
+  await page.locator('#landing-sample-answer').fill('8.3')
   await page.getByRole('button', { name: '80%', exact: true }).click()
   await page.getByRole('button', { name: 'Commit answer', exact: true }).click()
   await expect(page.getByText('Correct', { exact: true })).toBeVisible()

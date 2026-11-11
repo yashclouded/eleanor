@@ -140,18 +140,18 @@ export const conditionalTreeTemplate: Template<ConditionalTreeParams> = {
   sample(rng: Rng, level: number): ConditionalTreeParams {
     if (level === 4) {
       // 3 branches at root summing to 100%
-      const pRoot1 = rng.pick([20, 25, 30, 40, 50])
-      const pRoot2 = rng.pick([20, 25, 30])
+      const pRoot1 = rng.int(20, 50)
+      const pRoot2 = rng.int(20, 30)
       const pRoot3 = 100 - pRoot1 - pRoot2
-      const pBranch1 = rng.pick([60, 70, 80, 90])
-      const pBranch2 = rng.pick([20, 30, 40, 50])
-      const pBranch3 = rng.pick([10, 15, 25, 35])
+      const pBranch1 = rng.int(60, 90)
+      const pBranch2 = rng.int(20, 50)
+      const pBranch3 = rng.int(10, 35)
       return { level, pRoot1, pRoot2, pRoot3, pBranch1, pBranch2, pBranch3 }
     } else {
-      const pRoot1 = rng.pick([40, 50, 60, 70, 80])
+      const pRoot1 = rng.int(40, 80)
       const pRoot2 = 100 - pRoot1
-      const pBranch1 = rng.pick([60, 70, 75, 80, 85, 90])
-      const pBranch2 = rng.pick([10, 15, 20, 25, 30, 40])
+      const pBranch1 = rng.int(60, 90)
+      const pBranch2 = rng.int(10, 40)
       return { level, pRoot1, pRoot2, pBranch1, pBranch2 }
     }
   },

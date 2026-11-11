@@ -72,6 +72,8 @@ export function SetSummary({ summary, onAnotherSet }: SetSummaryProps) {
       <div
         style={{
           display: 'flex',
+          flexWrap: 'wrap',
+          gap: 'var(--space-3)',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: 'var(--space-4) var(--space-5)',
@@ -202,7 +204,7 @@ export function SetSummary({ summary, onAnotherSet }: SetSummaryProps) {
       </div>
 
       {/* Actions */}
-      <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', justifyContent: 'center' }}>
         <Link to="/today" className="btn btn-secondary">
           Back to Today
         </Link>

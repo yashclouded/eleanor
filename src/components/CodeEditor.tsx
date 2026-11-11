@@ -120,6 +120,7 @@ export function CodeEditor({
       doc: source,
       extensions: [
         basicSetup,
+        EditorView.contentAttributes.of({ 'aria-label': 'Code editor' }),
         langCompartment.of(getLangExtension(language)),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {

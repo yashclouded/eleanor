@@ -63,7 +63,7 @@ const steps: Step<FermiQuantityParams>[] = [
       return [
         {
           t: 'p',
-          text: `Multiplying all independent factors together produces the total estimated magnitude of ${prod.toLocaleString()}.`,
+          text: `Multiplying the scale factors together produces the total estimated magnitude of ${prod.toLocaleString()}.`,
         },
       ]
     },
@@ -220,7 +220,7 @@ export const fermiQuantityTemplate: Template<FermiQuantityParams> = {
         return [
           {
             t: 'p',
-            text: `A high-speed rail network operates ${p.factor1} trainsets. Each trainset carries ${p.factor2} passengers per departure, completes trips covering ${p.factor3} track kilometers, runs for ${p.factor4} departures per year, with a network service utilization factor of ${p.factor5}.`,
+            text: `A high-speed rail network operates ${p.factor1} trainsets. Each trainset carries ${p.factor2} passengers per departure, completes trips covering ${p.factor3} track kilometers, runs for ${p.factor4} departures per year, with a network expansion multiplier of ${p.factor5} relative to the listed schedule.`,
           },
           {
             t: 'p',
@@ -256,7 +256,7 @@ export const fermiQuantityTemplate: Template<FermiQuantityParams> = {
         return [
           {
             t: 'p',
-            text: `A retail chain serves ${p.factor1.toLocaleString()} active loyalty members. About ${(p.factor2 * 100).toFixed(0)}% of these members order deliveries each week. Each delivery uses an average of ${p.factor3} biodegradable packaging pouches, over ${p.factor4} operating days per year.`,
+            text: `A retail chain serves ${p.factor1.toLocaleString()} active loyalty members. About ${(p.factor2 * 100).toFixed(0)}% of these members place one delivery order each operating day. Each delivery uses an average of ${p.factor3} biodegradable packaging pouches, over ${p.factor4} operating days per year.`,
           },
           {
             t: 'p',
@@ -337,7 +337,7 @@ export const fermiQuantityTemplate: Template<FermiQuantityParams> = {
       },
       {
         t: 'p',
-        text: `The product of these decomposition terms yields an expected estimate of approximately ${res.toLocaleString()}. Any estimate within a factor of about 2 (log10 tolerance 0.3) is accepted as calibrated.`,
+        text: `The product of these decomposition terms yields an expected estimate of approximately ${res.toLocaleString()}. Any estimate within a factor of about 2 (log10 tolerance 0.3) is accepted.`,
       },
     ]
   },

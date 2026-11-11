@@ -431,13 +431,13 @@ isOneToOne: false
                   ]
                 },"profiles": {
                   Row: {
-                    "age_confirmed_at": string,"banned_at": string | null,"created_at": string,"handle": string,"handle_changed_at": string | null,"id": string,"intensity": string,"leaderboard_visible": boolean,"pledge_accepted_at": string,"rating_reveal": string,"reduced_motion": boolean,"set_size": number,"terms_accepted_at": string,"theme": string,"tracks": (string)[],"weekly_goal": number
+                    "age_confirmed_at": string,"avatar_data_url": string | null,"banned_at": string | null,"celebrations_enabled": boolean,"created_at": string,"display_name": string | null,"handle": string,"handle_changed_at": string | null,"id": string,"intensity": string,"leaderboard_visible": boolean,"pledge_accepted_at": string,"rating_reveal": string,"reduced_motion": boolean,"set_size": number,"sound_enabled": boolean,"terms_accepted_at": string,"theme": string,"tracks": (string)[],"weekly_goal": number
                   }
                   Insert: {
-                    "age_confirmed_at": string,"banned_at"?: string | null,"created_at"?: string,"handle": string,"handle_changed_at"?: string | null,"id": string,"intensity"?: string,"leaderboard_visible": boolean,"pledge_accepted_at": string,"rating_reveal"?: string,"reduced_motion"?: boolean,"set_size"?: number,"terms_accepted_at": string,"theme"?: string,"tracks"?: (string)[],"weekly_goal"?: number
+                    "age_confirmed_at": string,"avatar_data_url"?: string | null,"banned_at"?: string | null,"celebrations_enabled"?: boolean,"created_at"?: string,"display_name"?: string | null,"handle": string,"handle_changed_at"?: string | null,"id": string,"intensity"?: string,"leaderboard_visible": boolean,"pledge_accepted_at": string,"rating_reveal"?: string,"reduced_motion"?: boolean,"set_size"?: number,"sound_enabled"?: boolean,"terms_accepted_at": string,"theme"?: string,"tracks"?: (string)[],"weekly_goal"?: number
                   }
                   Update: {
-                    "age_confirmed_at"?: string,"banned_at"?: string | null,"created_at"?: string,"handle"?: string,"handle_changed_at"?: string | null,"id"?: string,"intensity"?: string,"leaderboard_visible"?: boolean,"pledge_accepted_at"?: string,"rating_reveal"?: string,"reduced_motion"?: boolean,"set_size"?: number,"terms_accepted_at"?: string,"theme"?: string,"tracks"?: (string)[],"weekly_goal"?: number
+                    "age_confirmed_at"?: string,"avatar_data_url"?: string | null,"banned_at"?: string | null,"celebrations_enabled"?: boolean,"created_at"?: string,"display_name"?: string | null,"handle"?: string,"handle_changed_at"?: string | null,"id"?: string,"intensity"?: string,"leaderboard_visible"?: boolean,"pledge_accepted_at"?: string,"rating_reveal"?: string,"reduced_motion"?: boolean,"set_size"?: number,"sound_enabled"?: boolean,"terms_accepted_at"?: string,"theme"?: string,"tracks"?: (string)[],"weekly_goal"?: number
                   }
                   Relationships: [
 
@@ -635,6 +635,9 @@ isOneToOne: false
 { Args: { "p_day": string,"p_user_id"?: string }; Returns: Json
                            },
 "public_profile":
+{ Args: { "p_handle": string }; Returns: Json
+                           },
+"public_profile_ratings":
 { Args: { "p_handle": string }; Returns: Json
                            },
 "scan_integrity":

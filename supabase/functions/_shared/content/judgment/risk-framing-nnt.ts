@@ -85,7 +85,7 @@ const steps: Step<RiskNntParams>[] = [
       {
         t: 'p',
         text: p.level === 4
-          ? 'What is the total expenditure (in dollars) required to prevent one adverse event (NNT × unit cost)?'
+          ? 'What is the total expenditure (in dollars) required for an expected reduction of at least one adverse event (NNT × unit cost)?'
           : 'What is the Number Needed to Treat (NNT), rounded up to the nearest whole integer?',
       },
     ],
@@ -122,7 +122,7 @@ const steps: Step<RiskNntParams>[] = [
       return [
         {
           t: 'p',
-          text: `Rounding up to ensure at least one full event is prevented gives NNT = ${nnt}.`,
+          text: `Rounding up to an expected reduction of at least one event gives NNT = ${nnt}.`,
         },
       ]
     },
@@ -153,10 +153,8 @@ export const riskFramingNntTemplate: Template<RiskNntParams> = {
 
   sample(rng: Rng, level: number): RiskNntParams {
     if (level === 1) {
-      const bVals = [3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 7.0, 8.0, 9.0, 10.0]
-      const b = rng.pick(bVals)
-      const diffs = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
-      const diff = rng.pick(diffs)
+      const b = rng.int(35, 100) / 10
+      const diff = rng.int(5, 30) / 10
       const t = Number((b - diff).toFixed(1))
       return { level, baselinePercent: b, treatedPercent: t }
     } else if (level === 2) {
@@ -176,16 +174,13 @@ export const riskFramingNntTemplate: Template<RiskNntParams> = {
         events1,
       }
     } else if (level === 3) {
-      const baselines = [4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5]
-      const b = rng.pick(baselines)
-      const reductions = [1.2, 1.5, 1.8, 2.0, 2.4, 2.8, 3.0, 3.5]
-      const red = rng.pick(reductions)
+      const b = rng.int(40, 100) / 10
+      const red = rng.int(12, 35) / 10
       return { level, baselinePercent: b, treatedPercent: Number((b - red).toFixed(1)) }
     } else {
-      const bVals = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0]
-      const b = rng.pick(bVals)
-      const t = rng.pick([1.0, 1.5, 2.0, 2.5, 3.0, 3.5])
-      const unitCost = rng.pick([100, 150, 200, 250, 300, 400, 500])
+      const b = rng.int(40, 120) / 10
+      const t = rng.int(10, 35) / 10
+      const unitCost = rng.int(10, 50) * 10
       return { level, baselinePercent: b, treatedPercent: t, unitCost }
     }
   },
@@ -275,7 +270,7 @@ export const riskFramingNntTemplate: Template<RiskNntParams> = {
           },
           {
             t: 'p',
-            text: 'What is the total expenditure (in dollars) required across the fleet to prevent exactly one collision (NNT × sensor cost)?',
+            text: 'What is the total expenditure (in dollars) required across the fleet for an expected reduction of at least one collision (NNT × sensor cost)?',
           },
         ]
       }
@@ -427,7 +422,7 @@ export const riskFramingNntTemplate: Template<RiskNntParams> = {
     }
     const arr = r0 - r1
     const rawNnt = 1 / arr
-    const nnt = Math.ceil(rawNnt)
+    const nnt = Math.ceil(rawNnt - 1e-9)
 
     const items = [
       `Baseline Risk (R₀) = ${(r0 * 100).toFixed(2)}%`,

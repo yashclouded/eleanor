@@ -13,25 +13,26 @@ import { RepairLadder, type RepairStepData } from '../components/RepairLadder.ts
 import { Reveal } from '../components/Reveal.tsx'
 import { InsightInput } from '../components/InsightInput.tsx'
 import { SetSummary, type SetSummaryData } from '../components/SetSummary.tsx'
-import type { RunResult } from '../components/CodeEditor.tsx'
 import { LoadPanel } from '../components/LoadPanel.tsx'
+import type { RunResult } from '../components/CodeEditor.tsx'
 import { CodeVerdict } from '../components/CodeVerdict.tsx'
-import { useOutcomeSound } from '../lib/useOutcomeSound.ts'
-import { prepareSound } from '../lib/feedback.ts'
+import { useAnswerFeedback } from '../components/Experience.tsx'
 
-const CodeEditor = lazy(() => import('../components/CodeEditor.tsx').then((module) => ({ default: module.CodeEditor })))
+const CodeEditor = lazy(() =>
+  import('../components/CodeEditor.tsx').then((module) => ({ default: module.CodeEditor }))
+)
 
 export function SetPlayer() {
   const { setId } = useParams<{ setId: string }>()
   const navigate = useNavigate()
   const { profile, user } = useAuth()
+  const feedback = useAnswerFeedback()
 
   const [loading, setLoading] = useState(true)
   const [initError, setInitError] = useState<string | null>(null)
 
   // Current Attempt state
   const [attempt, setAttempt] = useState<AttemptView | null>(null)
-  useOutcomeSound(attempt)
   const [isDone, setIsDone] = useState(false)
   const [summary, setSummary] = useState<SetSummaryData | null>(null)
 
@@ -224,7 +225,8 @@ export function SetPlayer() {
     if (!attempt || draftConfidence === null) return
     const parsed = parseAnswer(attempt.answerSpec, draftAnswer)
     if (!parsed.ok) return
-    void prepareSound()
+
+    feedback.prepare()
 
     try {
       const res = await commitAction.run({
@@ -233,6 +235,7 @@ export function SetPlayer() {
         declaredHelp,
       })
 
+      feedback.celebrate(attempt.id, res.outcome === 'correct')
       // Update attempt to resolved state
       setAttempt((prev) => {
         if (!prev) return null
@@ -267,7 +270,7 @@ export function SetPlayer() {
   const handleSubmitCode = async () => {
     if (!attempt || !codeSource.trim() || isJudging) return
     if (attempt.state === 'presented' && draftConfidence === null) return
-    void prepareSound()
+    feedback.prepare()
     setIsJudging(true)
     setCodeSubmitError(null)
     setCodeCompileError(null)
@@ -324,6 +327,7 @@ export function SetPlayer() {
             // Evaluated verdict (accepted, wrong_answer, time_limit, runtime_error)
             const fresh = await api<AttemptView>(`/attempts/${attempt.id}`)
             setAttempt(fresh)
+            feedback.celebrate(submitRes.submissionId, sub.verdict === 'accepted')
             setCodeVerdictInfo({
               verdict: sub.verdict || fresh.result?.verdict || 'accepted',
               failedGroupLabel: fresh.result?.failedGroupLabel,
@@ -366,7 +370,6 @@ export function SetPlayer() {
   const handleConfirmGiveUp = async () => {
     setShowGiveUpConfirm(false)
     if (!attempt) return
-    void prepareSound()
 
     try {
       const res = await giveUpAction.run({})
@@ -469,7 +472,7 @@ export function SetPlayer() {
         }}
       >
         <div>
-          <h1
+          <span
             style={{
               fontSize: '0.75rem',
               fontWeight: 700,
@@ -479,7 +482,7 @@ export function SetPlayer() {
             }}
           >
             {attempt.track.toUpperCase()} TRACK · {attempt.concept.name}
-          </h1>
+          </span>
           {attempt.slot !== null && (
             <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: 600 }}>
               Problem {attempt.slot + 1}
@@ -499,32 +502,34 @@ export function SetPlayer() {
       {isCodeProblem ? (
         <>
           {/* Code Editor component handles problem statement, input/output formats, constraints, samples, and code editing */}
-          <LoadPanel label="code editor"><CodeEditor
-            attemptId={attempt.id}
-            statementBlocks={
-              attempt.answerSpec.type === 'code' && attempt.answerSpec.statement
-                ? attempt.answerSpec.statement
-                : attempt.prompt
-            }
-            inputFormatBlocks={
-              attempt.answerSpec.type === 'code' ? attempt.answerSpec.inputFormat : undefined
-            }
-            outputFormatBlocks={
-              attempt.answerSpec.type === 'code' ? attempt.answerSpec.outputFormat : undefined
-            }
-            constraintsBlocks={
-              attempt.answerSpec.type === 'code' ? attempt.answerSpec.constraints : undefined
-            }
-            samples={
-              attempt.answerSpec.type === 'code' ? attempt.answerSpec.samples : undefined
-            }
-            source={codeSource}
-            onChange={setCodeSource}
-            language={codeLanguage}
-            onLanguageChange={setCodeLanguage}
-            onRun={handleRunCode}
-            disabled={isJudging}
-          /></LoadPanel>
+          <LoadPanel label="code editor">
+            <CodeEditor
+              attemptId={attempt.id}
+              statementBlocks={
+                attempt.answerSpec.type === 'code' && attempt.answerSpec.statement
+                  ? attempt.answerSpec.statement
+                  : attempt.prompt
+              }
+              inputFormatBlocks={
+                attempt.answerSpec.type === 'code' ? attempt.answerSpec.inputFormat : undefined
+              }
+              outputFormatBlocks={
+                attempt.answerSpec.type === 'code' ? attempt.answerSpec.outputFormat : undefined
+              }
+              constraintsBlocks={
+                attempt.answerSpec.type === 'code' ? attempt.answerSpec.constraints : undefined
+              }
+              samples={
+                attempt.answerSpec.type === 'code' ? attempt.answerSpec.samples : undefined
+              }
+              source={codeSource}
+              onChange={setCodeSource}
+              language={codeLanguage}
+              onLanguageChange={setCodeLanguage}
+              onRun={handleRunCode}
+              disabled={isJudging}
+            />
+          </LoadPanel>
 
           {/* Compilation error verdict shown in presented state */}
           {isPresented && (codeCompileError || (codeVerdictInfo && codeVerdictInfo.verdict === 'compile_error')) && (

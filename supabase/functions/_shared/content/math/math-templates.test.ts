@@ -14,8 +14,8 @@ const ids = [
 ].map((id) => `math.${id}`)
 
 describe('Task 6.4 math drafts', () => {
-  it('registers exactly the requested math bank with valid concepts', () => {
-    const bank = TEMPLATES.filter((t) => t.track === 'math')
+  it('preserves the twelve original math templates with valid concepts', () => {
+    const bank = TEMPLATES.filter((t) => ids.includes(t.id))
     expect(bank.map((t) => t.id).sort()).toEqual([...ids].sort())
     expect(checkBank(bank, CONCEPTS)).toEqual([])
   })
