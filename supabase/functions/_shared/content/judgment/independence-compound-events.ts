@@ -124,23 +124,24 @@ export const independenceCompoundEventsTemplate: Template<IndependenceCompoundPa
   dailyLevels: [2, 3, 4],
 
   sample(rng: Rng, level: number): IndependenceCompoundParams {
-    const pAPercent = rng.pick([15, 20, 25, 30, 35, 40, 45, 50, 55, 60])
-    const pBPercent = rng.pick([10, 15, 20, 25, 30, 35, 40, 45, 50])
+    const pAPercent = rng.int(15, 60)
+    const pBPercent = rng.int(10, 50)
 
     if (level === 1) {
       return { level, pAPercent, pBPercent }
     } else if (level === 2) {
-      const pCPercent = rng.pick([20, 25, 30, 35, 40, 50])
+      const pCPercent = rng.int(20, 50)
       return { level, pAPercent, pBPercent, pCPercent }
     } else if (level === 3) {
       const indepJoint = (pAPercent * pBPercent) / 100
-      const delta = rng.pick([3, 4, 5, 6, 8])
+      // An observed intersection cannot exceed either marginal probability.
+      const delta = rng.int(1, Math.min(8, Math.floor(Math.min(pAPercent, pBPercent) - indepJoint)))
       const pJointPercent = indepJoint + delta
       return { level, pAPercent, pBPercent, pJointPercent }
     } else {
-      const paSmall = rng.pick([4, 5, 6, 8, 10, 12])
-      const pbSmall = rng.pick([4, 5, 6, 8, 10, 12])
-      const commonCausePercent = rng.pick([1, 2, 3, 4, 5, 6])
+      const paSmall = rng.int(4, 12)
+      const pbSmall = rng.int(4, 12)
+      const commonCausePercent = rng.int(1, 6)
       return {
         level,
         pAPercent: paSmall,
@@ -220,7 +221,7 @@ export const independenceCompoundEventsTemplate: Template<IndependenceCompoundPa
         return [
           {
             t: 'p',
-            text: `Telemetry monitors two authentication microservices. Service A fails on ${p.pAPercent}% of requests, and Service B fails on ${p.pBPercent}% of requests. However, network logs show that BOTH services fail concurrently on ${p.pJointPercent?.toFixed(1)}% of requests.`,
+            text: `Telemetry monitors two authentication microservices. Service A fails on ${p.pAPercent}% of requests, and Service B fails on ${p.pBPercent}% of requests. However, network logs show that BOTH services fail concurrently on ${p.pJointPercent?.toFixed(2)}% of requests.`,
           },
           {
             t: 'p',
@@ -231,7 +232,7 @@ export const independenceCompoundEventsTemplate: Template<IndependenceCompoundPa
         return [
           {
             t: 'p',
-            text: `An infrastructure cluster uses redundant standby servers. Server 1 has an independent hardware failure rate of ${p.pAPercent}%, and Server 2 has an independent failure rate of ${p.pBPercent}%. In addition, both servers share a common power grid switchboard that has a ${p.commonCausePercent}% catastrophic common-cause failure rate.`,
+            text: `An infrastructure cluster uses redundant standby servers. The following hardware failure rates apply when there is no common-cause event. Server 1 has an independent hardware failure rate of ${p.pAPercent}%, and Server 2 has an independent failure rate of ${p.pBPercent}%. In addition, both servers share a common power grid switchboard that has a ${p.commonCausePercent}% catastrophic common-cause failure rate.`,
           },
           {
             t: 'p',
@@ -266,7 +267,7 @@ export const independenceCompoundEventsTemplate: Template<IndependenceCompoundPa
         return [
           {
             t: 'p',
-            text: `Telemetry monitors two satellite communication transponders: Transponder 1 exhibits signal dropouts ${p.pAPercent}% of the time, and Transponder 2 exhibits dropouts ${p.pBPercent}% of the time. Telemetry records both transponders experiencing simultaneous dropouts on ${p.pJointPercent?.toFixed(1)}% of orbits.`,
+            text: `Telemetry monitors two satellite communication transponders: Transponder 1 exhibits signal dropouts ${p.pAPercent}% of the time, and Transponder 2 exhibits dropouts ${p.pBPercent}% of the time. Telemetry records both transponders experiencing simultaneous dropouts on ${p.pJointPercent?.toFixed(2)}% of orbits.`,
           },
           {
             t: 'p',
@@ -277,7 +278,7 @@ export const independenceCompoundEventsTemplate: Template<IndependenceCompoundPa
         return [
           {
             t: 'p',
-            text: `A space probe guidance module utilizes dual redundant star trackers. Tracker 1 has an independent failure rate of ${p.pAPercent}%, Tracker 2 has an independent failure rate of ${p.pBPercent}%, and a solar flare flare radiation event causes a common-cause simultaneous blackout with ${p.commonCausePercent}% probability.`,
+            text: `A space probe guidance module utilizes dual redundant star trackers. The tracker failure rates below apply when no solar flare occurs. Tracker 1 has an independent failure rate of ${p.pAPercent}%, Tracker 2 has an independent failure rate of ${p.pBPercent}%, and a solar flare radiation event causes a common-cause simultaneous blackout with ${p.commonCausePercent}% probability.`,
           },
           {
             t: 'p',
@@ -313,7 +314,7 @@ export const independenceCompoundEventsTemplate: Template<IndependenceCompoundPa
         return [
           {
             t: 'p',
-            text: `An intermodal carrier monitors two regional freight hubs: Hub North experiences winter ground stops on ${p.pAPercent}% of days, and Hub South on ${p.pBPercent}% of days. Historical logs show that both hubs face simultaneous ground stops on ${p.pJointPercent?.toFixed(1)}% of days.`,
+            text: `An intermodal carrier monitors two regional freight hubs: Hub North experiences winter ground stops on ${p.pAPercent}% of days, and Hub South on ${p.pBPercent}% of days. Historical logs show that both hubs face simultaneous ground stops on ${p.pJointPercent?.toFixed(2)}% of days.`,
           },
           {
             t: 'p',
@@ -324,7 +325,7 @@ export const independenceCompoundEventsTemplate: Template<IndependenceCompoundPa
         return [
           {
             t: 'p',
-            text: `A refrigerated cargo supply chain uses two parallel compressor cooling engines. Engine A has an independent failure rate of ${p.pAPercent}%, Engine B has an independent failure rate of ${p.pBPercent}%, and electrical alternator line surges produce an unmitigated common-cause double failure with ${p.commonCausePercent}% probability.`,
+            text: `A refrigerated cargo supply chain uses two parallel compressor cooling engines. The engine failure rates below apply when there is no electrical surge. Engine A has an independent failure rate of ${p.pAPercent}%, Engine B has an independent failure rate of ${p.pBPercent}%, and electrical alternator line surges produce an unmitigated common-cause double failure with ${p.commonCausePercent}% probability.`,
           },
           {
             t: 'p',
@@ -376,19 +377,28 @@ export const independenceCompoundEventsTemplate: Template<IndependenceCompoundPa
     const pb = p.pBPercent / 100
     const joint = (p.pAPercent * p.pBPercent) / 100
     const union = (pa + pb - pa * pb) * 100
+    const items = [
+      `Under independence: P(A ∩ B) = (${p.pAPercent} / 100) × (${p.pBPercent} / 100) × 100 = ${joint.toFixed(2)}%`,
+    ]
+    if (p.level === 1) {
+      items.push(`P(A ∪ B) = P(A) + P(B) − P(A ∩ B) = ${p.pAPercent}% + ${p.pBPercent}% − ${joint.toFixed(2)}% = ${union.toFixed(2)}%`)
+    } else if (p.level === 2) {
+      items.push(`P(A ∩ B ∩ C) = (${joint} / 100) × (${p.pCPercent} / 100) × 100 = ${(joint * ((p.pCPercent ?? 40) / 100)).toFixed(2)}%`)
+    } else if (p.level === 3) {
+      items.push(`Observed minus independent joint probability = ${p.pJointPercent}% − ${joint.toFixed(2)}% = ${((p.pJointPercent ?? joint + 5) - joint).toFixed(2)}% (percentage points).`)
+    } else {
+      const cc = (p.commonCausePercent ?? 2) / 100
+      items.push(`Condition on the common cause: P(system failure) = ${cc} + (1 − ${cc}) × (${joint} / 100) = ${((cc + (1 - cc) * pa * pb) * 100).toFixed(2)}%`)
+    }
 
     return [
       {
         t: 'p',
-        text: 'When events A and B are statistically independent:',
+        text: p.level === 3 ? 'Compare the observed joint rate with the independence benchmark:' : 'Use the probability model stated in the question:',
       },
       {
         t: 'list',
-        items: [
-          `Product Rule for Joint Events: P(A ∩ B) = P(A) × P(B) = ${p.pAPercent}% × ${p.pBPercent}% = ${joint.toFixed(2)}%`,
-          `Addition Rule for Union: P(A ∪ B) = P(A) + P(B) − P(A ∩ B) = ${p.pAPercent}% + ${p.pBPercent}% − ${joint.toFixed(2)}% = ${union.toFixed(2)}%`,
-          `Complement Formulation: 1 − P(neither) = 1 − (1 − P(A))(1 − P(B)) = 1 − (${(1 - pa).toFixed(2)} × ${(1 - pb).toFixed(2)}) = ${union.toFixed(2)}%`,
-        ],
+        items,
       },
     ]
   },

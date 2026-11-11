@@ -17,7 +17,7 @@ const steps: Step<BaseRateTwoTestsParams>[] = [
     prompt: () => [
       {
         t: 'p',
-        text: 'In a hypothetical population of 100,000 true positive cases, how many produce this specific pair of test results?',
+        text: 'In a hypothetical population of 100,000 items, how many true cases produce this specific pair of test results?',
       },
     ],
     answer: (p) => {
@@ -242,7 +242,7 @@ export const baseRateTwoTestsTemplate: Template<BaseRateTwoTestsParams> = {
       return [
         {
           t: 'p',
-          text: `In a biochemical repository, a specific chemical contaminant has a baseline prevalence of ${p.baseRatePercent}%. Two independent diagnostic assays are used sequentially to check suspicious sample batches:`,
+          text: `In a biochemical repository, a specific chemical contaminant has a baseline prevalence of ${p.baseRatePercent}%. Two diagnostic assays, conditionally independent given contamination status, are used sequentially to check suspicious sample batches:`,
         },
         {
           t: 'list',
@@ -264,7 +264,7 @@ export const baseRateTwoTestsTemplate: Template<BaseRateTwoTestsParams> = {
       return [
         {
           t: 'p',
-          text: `An avionics diagnostic unit monitors for micro-fractures in turbine rotor blades, an anomaly with a background incidence of ${p.baseRatePercent}% per fleet inspection cycle. Two independent telemetry sensors scan each blade:`,
+          text: `An avionics diagnostic unit monitors for micro-fractures in turbine rotor blades, an anomaly with a background incidence of ${p.baseRatePercent}% per fleet inspection cycle. Two telemetry sensors, conditionally independent given fracture status, scan each blade:`,
         },
         {
           t: 'list',
@@ -287,7 +287,7 @@ export const baseRateTwoTestsTemplate: Template<BaseRateTwoTestsParams> = {
       return [
         {
           t: 'p',
-          text: `A vault access checkpoint verifies credentials against a restricted watch-list that comprises ${p.baseRatePercent}% of authorized facility entrants. Two independent biometric verification engines scan every entrant:`,
+          text: `A vault access checkpoint verifies credentials against a restricted watch-list that comprises ${p.baseRatePercent}% of authorized facility entrants. Two biometric verification engines, conditionally independent given watch-list status, scan every entrant:`,
         },
         {
           t: 'list',

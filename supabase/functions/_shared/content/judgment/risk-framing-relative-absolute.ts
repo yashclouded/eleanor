@@ -118,17 +118,15 @@ export const riskFramingRelativeAbsoluteTemplate: Template<RiskRelativeAbsoluteP
   dailyLevels: [3, 4],
 
   sample(rng: Rng, level: number): RiskRelativeAbsoluteParams {
-    const baselines = [2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 7.5, 8.0, 10.0, 12.0]
-    const baselineRiskPercent = rng.pick(baselines)
-    const relativeReductions = [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6]
-    const relRed = rng.pick(relativeReductions)
+    const baselineRiskPercent = rng.int(4, 40) / 2
+    const relRed = rng.int(2, 16) / 20
     const treatedRiskPercent = Number(
       (baselineRiskPercent * (1 - relRed)).toFixed(2),
     )
 
     if (level === 3) {
-      const baselineRiskBPercent = rng.pick([6.0, 8.0, 12.0, 15.0])
-      const relRedB = rng.pick([0.2, 0.25, 0.35])
+      const baselineRiskBPercent = rng.int(12, 30) / 2
+      const relRedB = rng.int(4, 7) / 20
       const treatedRiskBPercent = Number(
         (baselineRiskBPercent * (1 - relRedB)).toFixed(2),
       )
@@ -197,7 +195,7 @@ export const riskFramingRelativeAbsoluteTemplate: Template<RiskRelativeAbsoluteP
         return [
           {
             t: 'p',
-            text: `An industrial ergonomics program is advertised as reducing workstation repetitive strain injuries by ${rrr}% (relative risk reduction). Standard safety records indicate that the baseline injury risk without the program is ${p.baselineRiskPercent.toFixed(1)}%. With the program, the injury risk drops to ${p.treatedRiskPercent.toFixed(1)}%.`,
+            text: `An industrial ergonomics program is advertised as reducing workstation repetitive strain injuries by ${rrr}% (relative risk reduction). Standard safety records indicate that the baseline injury risk without the program is ${p.baselineRiskPercent.toFixed(2)}%. With the program, the injury risk drops to ${p.treatedRiskPercent.toFixed(2)}%.`,
           },
           {
             t: 'p',
@@ -208,7 +206,7 @@ export const riskFramingRelativeAbsoluteTemplate: Template<RiskRelativeAbsoluteP
         return [
           {
             t: 'p',
-            text: `In a manufacturing facility, the baseline rate of repetitive strain injuries is ${p.baselineRiskPercent.toFixed(1)}%. After introducing ergonomic tool redesigns, the injury rate decreases to ${p.treatedRiskPercent.toFixed(1)}%.`,
+            text: `In a manufacturing facility, the baseline rate of repetitive strain injuries is ${p.baselineRiskPercent.toFixed(2)}%. After introducing ergonomic tool redesigns, the injury rate decreases to ${p.treatedRiskPercent.toFixed(2)}%.`,
           },
           {
             t: 'p',
@@ -224,8 +222,8 @@ export const riskFramingRelativeAbsoluteTemplate: Template<RiskRelativeAbsoluteP
           {
             t: 'list',
             items: [
-              `Intervention A: Reduces injury risk from ${p.baselineRiskPercent.toFixed(1)}% down to ${p.treatedRiskPercent.toFixed(1)}%.`,
-              `Intervention B: Reduces injury risk from ${p.baselineRiskBPercent?.toFixed(1)}% down to ${p.treatedRiskBPercent?.toFixed(1)}%.`,
+              `Intervention A: Reduces injury risk from ${p.baselineRiskPercent.toFixed(2)}% down to ${p.treatedRiskPercent.toFixed(2)}%.`,
+              `Intervention B: Reduces injury risk from ${p.baselineRiskBPercent?.toFixed(2)}% down to ${p.treatedRiskBPercent?.toFixed(2)}%.`,
             ],
           },
           {
@@ -237,7 +235,7 @@ export const riskFramingRelativeAbsoluteTemplate: Template<RiskRelativeAbsoluteP
         return [
           {
             t: 'p',
-            text: `A corporate health study notes that workers without periodic micro-breaks have an annual repetitive strain incidence of ${p.baselineRiskPercent.toFixed(1)}%, while workers adhering to mandatory micro-breaks have an incidence of ${p.treatedRiskPercent.toFixed(1)}%.`,
+            text: `A corporate health study notes that workers without periodic micro-breaks have an annual repetitive strain incidence of ${p.baselineRiskPercent.toFixed(2)}%, while workers adhering to mandatory micro-breaks have an incidence of ${p.treatedRiskPercent.toFixed(2)}%.`,
           },
           {
             t: 'p',
@@ -250,7 +248,7 @@ export const riskFramingRelativeAbsoluteTemplate: Template<RiskRelativeAbsoluteP
         return [
           {
             t: 'p',
-            text: `A security software vendor claims that its endpoint agent provides a ${rrr}% relative risk reduction against phishing compromise. Fleet logs show an untreated baseline breach risk of ${p.baselineRiskPercent.toFixed(1)}%, which falls to ${p.treatedRiskPercent.toFixed(1)}% when protected.`,
+            text: `A security software vendor claims that its endpoint agent provides a ${rrr}% relative risk reduction against phishing compromise. Fleet logs show an untreated baseline breach risk of ${p.baselineRiskPercent.toFixed(2)}%, which falls to ${p.treatedRiskPercent.toFixed(2)}% when protected.`,
           },
           {
             t: 'p',
@@ -261,7 +259,7 @@ export const riskFramingRelativeAbsoluteTemplate: Template<RiskRelativeAbsoluteP
         return [
           {
             t: 'p',
-            text: `Across enterprise workstations, the baseline malware infection risk without advanced isolation is ${p.baselineRiskPercent.toFixed(1)}%. Deploying browser sandboxing reduces this infection rate to ${p.treatedRiskPercent.toFixed(1)}%.`,
+            text: `Across enterprise workstations, the baseline malware infection risk without advanced isolation is ${p.baselineRiskPercent.toFixed(2)}%. Deploying browser sandboxing reduces this infection rate to ${p.treatedRiskPercent.toFixed(2)}%.`,
           },
           {
             t: 'p',
@@ -277,8 +275,8 @@ export const riskFramingRelativeAbsoluteTemplate: Template<RiskRelativeAbsoluteP
           {
             t: 'list',
             items: [
-              `Control A: Cuts compromise risk from ${p.baselineRiskPercent.toFixed(1)}% to ${p.treatedRiskPercent.toFixed(1)}%.`,
-              `Control B: Cuts compromise risk from ${p.baselineRiskBPercent?.toFixed(1)}% to ${p.treatedRiskBPercent?.toFixed(1)}%.`,
+              `Control A: Cuts compromise risk from ${p.baselineRiskPercent.toFixed(2)}% to ${p.treatedRiskPercent.toFixed(2)}%.`,
+              `Control B: Cuts compromise risk from ${p.baselineRiskBPercent?.toFixed(2)}% to ${p.treatedRiskBPercent?.toFixed(2)}%.`,
             ],
           },
           {
@@ -290,7 +288,7 @@ export const riskFramingRelativeAbsoluteTemplate: Template<RiskRelativeAbsoluteP
         return [
           {
             t: 'p',
-            text: `An annual audit reveals credential theft incidents at ${p.baselineRiskPercent.toFixed(1)}% on password-only accounts, compared to ${p.treatedRiskPercent.toFixed(1)}% on accounts with hardware security keys.`,
+            text: `An annual audit reveals credential theft incidents at ${p.baselineRiskPercent.toFixed(2)}% on password-only accounts, compared to ${p.treatedRiskPercent.toFixed(2)}% on accounts with hardware security keys.`,
           },
           {
             t: 'p',
@@ -304,7 +302,7 @@ export const riskFramingRelativeAbsoluteTemplate: Template<RiskRelativeAbsoluteP
         return [
           {
             t: 'p',
-            text: `A biological fungicide trial reports a ${rrr}% relative risk reduction in fungal blight across orchard test plots. Untreated control trees experience a blight incidence of ${p.baselineRiskPercent.toFixed(1)}%, while treated trees have an incidence of ${p.treatedRiskPercent.toFixed(1)}%.`,
+            text: `A biological fungicide trial reports a ${rrr}% relative risk reduction in fungal blight across orchard test plots. Untreated control trees experience a blight incidence of ${p.baselineRiskPercent.toFixed(2)}%, while treated trees have an incidence of ${p.treatedRiskPercent.toFixed(2)}%.`,
           },
           {
             t: 'p',
@@ -315,7 +313,7 @@ export const riskFramingRelativeAbsoluteTemplate: Template<RiskRelativeAbsoluteP
         return [
           {
             t: 'p',
-            text: `A field trial measures seasonal mildew crop losses at ${p.baselineRiskPercent.toFixed(1)}% in untreated rows, compared to ${p.treatedRiskPercent.toFixed(1)}% in rows treated with organic bio-coatings.`,
+            text: `A field trial measures seasonal mildew crop losses at ${p.baselineRiskPercent.toFixed(2)}% in untreated rows, compared to ${p.treatedRiskPercent.toFixed(2)}% in rows treated with organic bio-coatings.`,
           },
           {
             t: 'p',
@@ -331,8 +329,8 @@ export const riskFramingRelativeAbsoluteTemplate: Template<RiskRelativeAbsoluteP
           {
             t: 'list',
             items: [
-              `Treatment A: Reduces blight from ${p.baselineRiskPercent.toFixed(1)}% to ${p.treatedRiskPercent.toFixed(1)}%.`,
-              `Treatment B: Reduces blight from ${p.baselineRiskBPercent?.toFixed(1)}% to ${p.treatedRiskBPercent?.toFixed(1)}%.`,
+              `Treatment A: Reduces blight from ${p.baselineRiskPercent.toFixed(2)}% to ${p.treatedRiskPercent.toFixed(2)}%.`,
+              `Treatment B: Reduces blight from ${p.baselineRiskBPercent?.toFixed(2)}% to ${p.treatedRiskBPercent?.toFixed(2)}%.`,
             ],
           },
           {
@@ -344,7 +342,7 @@ export const riskFramingRelativeAbsoluteTemplate: Template<RiskRelativeAbsoluteP
         return [
           {
             t: 'p',
-            text: `Crop yield data records root rot disease incidence at ${p.baselineRiskPercent.toFixed(1)}% in conventional tillage, versus ${p.treatedRiskPercent.toFixed(1)}% under conservation strip-tillage.`,
+            text: `Crop yield data records root rot disease incidence at ${p.baselineRiskPercent.toFixed(2)}% in conventional tillage, versus ${p.treatedRiskPercent.toFixed(2)}% under conservation strip-tillage.`,
           },
           {
             t: 'p',
@@ -396,6 +394,11 @@ export const riskFramingRelativeAbsoluteTemplate: Template<RiskRelativeAbsoluteP
   solution(p: RiskRelativeAbsoluteParams): Block[] {
     const arr = p.baselineRiskPercent - p.treatedRiskPercent
     const rrr = (arr / p.baselineRiskPercent) * 100
+    const comparison: Block[] = []
+    if (p.level === 3) {
+      const arrB = (p.baselineRiskBPercent ?? 10) - (p.treatedRiskBPercent ?? 7)
+      comparison.push({ t: 'p', text: `Intervention B ARR = ${p.baselineRiskBPercent}% − ${p.treatedRiskBPercent}% = ${arrB.toFixed(2)} percentage points. ARR of A minus ARR of B = ${arr.toFixed(2)} − ${arrB.toFixed(2)} = ${(arr - arrB).toFixed(2)} percentage points.` })
+    }
 
     return [
       {
@@ -411,6 +414,7 @@ export const riskFramingRelativeAbsoluteTemplate: Template<RiskRelativeAbsoluteP
           `Relative Risk Reduction (RRR) = (ARR / R₀) × 100 = (${arr.toFixed(2)} / ${p.baselineRiskPercent.toFixed(2)}) × 100 = ${rrr.toFixed(1)}%`,
         ],
       },
+      ...comparison,
     ]
   },
 }

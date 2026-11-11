@@ -23,12 +23,16 @@ const steps: Step<ExpectedValueBetsParams>[] = [
         text: 'Calculate the probability-weighted return from the favorable winning outcome.',
       },
     ],
-    answer: (p) => (p.pWinPercent / 100) * p.winPayout,
+    answer: (p) => p.level === 4
+      ? (p.pWinPercent / 100) * ((p.stage2WinPercent ?? 50) / 100) * (p.stage2Payout ?? 800)
+      : (p.pWinPercent / 100) * p.winPayout,
     tolerance: { abs: 0.1 },
     explain: (p) => [
       {
         t: 'p',
-        text: `Multiply win probability (${p.pWinPercent}%) by win payoff (${p.winPayout}): (${p.pWinPercent} / 100) × ${p.winPayout} = ${((p.pWinPercent / 100) * p.winPayout).toFixed(2)}.`,
+        text: p.level === 4
+          ? `The favorable terminal outcome requires success at both stages: (${p.pWinPercent} / 100) × (${p.stage2WinPercent} / 100) × ${p.stage2Payout}.`
+          : `Multiply win probability (${p.pWinPercent}%) by win payoff (${p.winPayout}): (${p.pWinPercent} / 100) × ${p.winPayout} = ${((p.pWinPercent / 100) * p.winPayout).toFixed(2)}.`,
       },
     ],
   },
@@ -40,12 +44,16 @@ const steps: Step<ExpectedValueBetsParams>[] = [
       },
     ],
     answer: (p) => {
-      const pLoss = 100 - p.pWinPercent - (p.pPushPercent ?? 0)
+      const pLoss = p.level === 4
+        ? 100 - p.pWinPercent * ((p.stage2WinPercent ?? 50) / 100)
+        : 100 - p.pWinPercent - (p.pPushPercent ?? 0)
       return (pLoss / 100) * p.lossCost
     },
     tolerance: { abs: 0.1 },
     explain: (p) => {
-      const pLoss = 100 - p.pWinPercent - (p.pPushPercent ?? 0)
+      const pLoss = p.level === 4
+        ? 100 - p.pWinPercent * ((p.stage2WinPercent ?? 50) / 100)
+        : 100 - p.pWinPercent - (p.pPushPercent ?? 0)
       return [
         {
           t: 'p',
@@ -118,19 +126,19 @@ export const expectedValueBetsTemplate: Template<ExpectedValueBetsParams> = {
   dailyLevels: [3, 4],
 
   sample(rng: Rng, level: number): ExpectedValueBetsParams {
-    const pWinPercent = rng.pick([30, 35, 40, 45, 55, 60, 65])
-    const winPayout = rng.pick([300, 400, 500, 600, 800])
-    const lossCost = rng.pick([100, 150, 200, 250])
+    const pWinPercent = rng.int(30, 65)
+    const winPayout = rng.int(30, 80) * 10
+    const lossCost = rng.int(10, 25) * 10
 
     if (level === 1) {
       return { level, pWinPercent, winPayout, lossCost }
     } else if (level === 2) {
-      const pPushPercent = rng.pick([15, 20, 25])
-      return { level, pWinPercent: 40, winPayout, lossCost, pPushPercent }
+      const pPushPercent = rng.int(15, 25)
+      return { level, pWinPercent, winPayout, lossCost, pPushPercent }
     } else if (level === 3) {
-      const pWinBPercent = rng.pick([50, 55, 60])
-      const winPayoutB = rng.pick([250, 350, 450])
-      const lossCostB = rng.pick([80, 120, 180])
+      const pWinBPercent = rng.int(50, 60)
+      const winPayoutB = rng.int(25, 45) * 10
+      const lossCostB = rng.int(8, 18) * 10
       return {
         level,
         pWinPercent,
@@ -141,8 +149,8 @@ export const expectedValueBetsTemplate: Template<ExpectedValueBetsParams> = {
         lossCostB,
       }
     } else {
-      const stage2WinPercent = rng.pick([40, 50, 60])
-      const stage2Payout = rng.pick([700, 900, 1200])
+      const stage2WinPercent = rng.int(40, 60)
+      const stage2Payout = rng.int(70, 120) * 10
       return {
         level,
         pWinPercent,
@@ -410,8 +418,10 @@ export const expectedValueBetsTemplate: Template<ExpectedValueBetsParams> = {
 
   solution(p: ExpectedValueBetsParams): Block[] {
     const pWin = p.pWinPercent / 100
-    const pLoss = (100 - p.pWinPercent - (p.pPushPercent ?? 0)) / 100
-    const gain = pWin * p.winPayout
+    const terminalWin = p.level === 4 ? pWin * ((p.stage2WinPercent ?? 50) / 100) : pWin
+    const pLoss = p.level === 4 ? 1 - terminalWin : (100 - p.pWinPercent - (p.pPushPercent ?? 0)) / 100
+    const payout = p.level === 4 ? (p.stage2Payout ?? 800) : p.winPayout
+    const gain = terminalWin * payout
     const loss = pLoss * p.lossCost
 
     let res = gain - loss
@@ -434,8 +444,8 @@ export const expectedValueBetsTemplate: Template<ExpectedValueBetsParams> = {
       {
         t: 'list',
         items: [
-          `Expected Gain = ${p.pWinPercent}% × ${p.winPayout} = ${gain.toFixed(2)} pts`,
-          `Expected Loss = ${(pLoss * 100).toFixed(0)}% × ${p.lossCost} = ${loss.toFixed(2)} pts`,
+          `Expected Gain = ${(terminalWin * 100).toFixed(2)}% × ${payout} = ${gain.toFixed(2)} pts`,
+          `Expected Loss = ${(pLoss * 100).toFixed(2)}% × ${p.lossCost} = ${loss.toFixed(2)} pts`,
           `Net Expected Value = ${res.toFixed(2)} pts`,
         ],
       },

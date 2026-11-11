@@ -1,0 +1,17 @@
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <numeric>
+#include <map>
+#include <set>
+#include <queue>
+#include <array>
+#include <functional>
+#include <climits>
+#include <utility>
+using namespace std;
+using ll=long long;
+ll solve(vector<ll> a,ll k){
+vector<array<ll,3>>v;for(ll i=0;i<(ll)a.size();i+=3)v.push_back({a[i+1],a[i],a[i+2]});sort(v.begin(),v.end());vector<ll>e,d(v.size()+1);for(auto z:v)e.push_back(z[0]);for(ll i=0;i<(ll)v.size();i++){auto [r,l,w]=v[i];ll p=upper_bound(e.begin(),e.begin()+i,l)-e.begin();d[i+1]=max(d[i],w+d[p]);}return d.back();
+}
+int main(){ios::sync_with_stdio(false);cin.tie(nullptr);int t;cin>>t;while(t--){ll n,k;cin>>n>>k;vector<ll>a(n);for(ll &x:a)cin>>x;cout<<solve(a,k)<<'\n';}}

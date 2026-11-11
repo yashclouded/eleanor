@@ -101,47 +101,11 @@ export const oddsLikelihoodRatioTemplate: Template<OddsLikelihoodRatioParams> = 
 
   sample(rng: Rng, level: number): OddsLikelihoodRatioParams {
     if (level === 1) {
-      const priorPairs = [
-        { a: 1, b: 3 },
-        { a: 1, b: 4 },
-        { a: 1, b: 5 },
-        { a: 1, b: 7 },
-        { a: 1, b: 9 },
-        { a: 1, b: 14 },
-        { a: 1, b: 19 },
-        { a: 1, b: 24 },
-        { a: 1, b: 39 },
-        { a: 1, b: 49 },
-      ]
-      const pair = rng.pick(priorPairs)
-      const lrs = [4, 6, 8, 10, 12, 15, 18, 20, 24, 30]
-      const lr1 = rng.pick(lrs)
-      return { level, priorA: pair.a, priorB: pair.b, lr1 }
+      return { level, priorA: 1, priorB: rng.int(3, 49), lr1: rng.int(4, 30) }
     } else if (level === 2) {
-      const pair = rng.pick([
-        { a: 1, b: 4 },
-        { a: 1, b: 9 },
-        { a: 1, b: 14 },
-        { a: 1, b: 19 },
-        { a: 1, b: 29 },
-        { a: 1, b: 49 },
-        { a: 1, b: 99 },
-      ])
-      const lr1 = rng.pick([4, 5, 6, 8, 10, 12, 15])
-      const lr2 = rng.pick([3, 4, 5, 6, 8, 10])
-      return { level, priorA: pair.a, priorB: pair.b, lr1, lr2 }
+      return { level, priorA: 1, priorB: rng.int(4, 99), lr1: rng.int(4, 15), lr2: rng.int(3, 10) }
     } else {
-      const pair = rng.pick([
-        { a: 1, b: 2 },
-        { a: 1, b: 3 },
-        { a: 1, b: 4 },
-        { a: 1, b: 5 },
-        { a: 1, b: 7 },
-        { a: 1, b: 9 },
-      ])
-      const lr1 = rng.pick([10, 12, 15, 18, 20, 25, 30])
-      const lr2 = rng.pick([0.1, 0.15, 0.2, 0.25, 0.3, 0.4])
-      return { level, priorA: pair.a, priorB: pair.b, lr1, lr2 }
+      return { level, priorA: 1, priorB: rng.int(2, 19), lr1: rng.int(10, 30), lr2: rng.int(10, 40) / 100 }
     }
   },
 
@@ -162,9 +126,12 @@ export const oddsLikelihoodRatioTemplate: Template<OddsLikelihoodRatioParams> = 
   render(p: OddsLikelihoodRatioParams, skin: string): Block[] {
     const p0Pct = ((p.priorA / (p.priorA + p.priorB)) * 100).toFixed(1)
 
+    const assumption: Block[] = p.lr2 === undefined ? [] : [{ t: 'note', text: 'Assume the evidence items are conditionally independent given either hypothesis; each likelihood ratio compares that same hypothesis with its alternative.' }]
+
     if (skin === 'forensic') {
       if (p.level === 1) {
         return [
+          ...assumption,
           {
             t: 'p',
             text: `In a criminal forensic evaluation, the prior odds that a suspect was present at the crime scene are estimated at ${p.priorA}:${p.priorB} (corresponding to a prior probability of approximately ${p0Pct}%). A forensic DNA electropherogram profile recovered from a latent trace produces a Likelihood Ratio (Bayes Factor) of ${p.lr1} in favor of presence.`,
@@ -176,6 +143,7 @@ export const oddsLikelihoodRatioTemplate: Template<OddsLikelihoodRatioParams> = 
         ]
       } else if (p.level === 2) {
         return [
+          ...assumption,
           {
             t: 'p',
             text: `An investigative inquiry begins with prior odds of ${p.priorA}:${p.priorB} regarding suspect involvement. Forensic analysts introduce two independent pieces of physical evidence:`,
@@ -194,6 +162,7 @@ export const oddsLikelihoodRatioTemplate: Template<OddsLikelihoodRatioParams> = 
         ]
       } else {
         return [
+          ...assumption,
           {
             t: 'p',
             text: `A forensic case has prior odds of ${p.priorA}:${p.priorB}. Two independent forensic tests produce conflicting results:`,
@@ -214,6 +183,7 @@ export const oddsLikelihoodRatioTemplate: Template<OddsLikelihoodRatioParams> = 
     } else if (skin === 'astronomy') {
       if (p.level === 1) {
         return [
+          ...assumption,
           {
             t: 'p',
             text: `In an exoplanet transit survey, the prior odds that a target star possesses a transiting terrestrial planet are ${p.priorA}:${p.priorB}. Spectroscopic photometry observes a periodic dip with a Bayes factor (likelihood ratio) of ${p.lr1} favoring a true planetary transit over instrumental noise.`,
@@ -225,6 +195,7 @@ export const oddsLikelihoodRatioTemplate: Template<OddsLikelihoodRatioParams> = 
         ]
       } else if (p.level === 2) {
         return [
+          ...assumption,
           {
             t: 'p',
             text: `An astrophysical search for gravitational wave anomalies begins with prior candidate odds of ${p.priorA}:${p.priorB}. Two independent interferometers record correlated chirps:`,
@@ -243,6 +214,7 @@ export const oddsLikelihoodRatioTemplate: Template<OddsLikelihoodRatioParams> = 
         ]
       } else {
         return [
+          ...assumption,
           {
             t: 'p',
             text: `An astronomical radio signal candidate has prior odds of ${p.priorA}:${p.priorB}. Two observational tests yield conflicting Bayes factors:`,
@@ -264,6 +236,7 @@ export const oddsLikelihoodRatioTemplate: Template<OddsLikelihoodRatioParams> = 
       // Default: epidemiology
       if (p.level === 1) {
         return [
+          ...assumption,
           {
             t: 'p',
             text: `In an outbreak surveillance area, the prior odds of infection with a novel pathogen are ${p.priorA}:${p.priorB}. A clinical biomarker test yields a positive result with a Diagnostic Likelihood Ratio (sensitivity / false positive rate) of ${p.lr1}.`,
@@ -275,6 +248,7 @@ export const oddsLikelihoodRatioTemplate: Template<OddsLikelihoodRatioParams> = 
         ]
       } else if (p.level === 2) {
         return [
+          ...assumption,
           {
             t: 'p',
             text: `Clinical evaluation starts with prior infection odds of ${p.priorA}:${p.priorB}. A patient undergoes two independent diagnostic evaluations:`,
@@ -293,6 +267,7 @@ export const oddsLikelihoodRatioTemplate: Template<OddsLikelihoodRatioParams> = 
         ]
       } else {
         return [
+          ...assumption,
           {
             t: 'p',
             text: `A diagnostic evaluation begins with prior odds of ${p.priorA}:${p.priorB}. Two independent clinical assays give conflicting readings:`,
@@ -338,7 +313,7 @@ export const oddsLikelihoodRatioTemplate: Template<OddsLikelihoodRatioParams> = 
         // Reporting posterior odds directly as probability without dividing by (1 + odds)
         let postOdds = (p.priorA / p.priorB) * p.lr1
         if (p.lr2) postOdds *= p.lr2
-        return postOdds * 10
+        return postOdds * 100
       },
       feedback: () =>
         'You reported the posterior odds directly without converting to probability. Probability is obtained from odds via P = Odds / (1 + Odds).',

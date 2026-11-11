@@ -129,21 +129,20 @@ export const regressionSelectionEffectTemplate: Template<RegressionSelectionPara
   dailyLevels: [1, 2, 3],
 
   sample(rng: Rng, level: number): RegressionSelectionParams {
-    const popMean = rng.pick([450, 500, 550, 600])
-    const reliabilities = [0.4, 0.5, 0.6, 0.7, 0.75]
-    const reliability = rng.pick(reliabilities)
+    const popMean = rng.int(45, 60) * 10
+    const reliability = rng.int(40, 75) / 100
 
     if (level === 1) {
       // Outlier initial score: e.g. +100 to +250 pts above mean
-      const dev = rng.pick([80, 100, 120, 150, 180, 200])
+      const dev = rng.int(8, 20) * 10
       const initialScore = popMean + dev
       return { level, popMean, initialScore, reliability }
     } else if (level === 2) {
       // Decompose reliability into varTrue and varError
-      const varTrue = rng.pick([3600, 4900, 6400])
-      const varError = rng.pick([1600, 2500, 3600])
+      const varTrue = rng.int(36, 64) * 100
+      const varError = rng.int(16, 36) * 100
       const r = varTrue / (varTrue + varError)
-      const dev = rng.pick([80, 120, 160, 200])
+      const dev = rng.int(8, 20) * 10
       return {
         level,
         popMean,
@@ -155,10 +154,10 @@ export const regressionSelectionEffectTemplate: Template<RegressionSelectionPara
     } else {
       // Level 3: Underperforming cohort receiving intervention
       // e.g. initial score 100 pts below mean
-      const dev = rng.pick([-120, -100, -80, -60])
+      const dev = -rng.int(6, 12) * 10
       const initialScore = popMean + dev
       const expectedRetest = popMean + reliability * dev
-      const observedRetest = expectedRetest + rng.pick([10, 15, 20, 25])
+      const observedRetest = Number((expectedRetest + rng.int(10, 25)).toFixed(2))
       return {
         level,
         popMean,
@@ -200,9 +199,12 @@ export const regressionSelectionEffectTemplate: Template<RegressionSelectionPara
       r = p.varTrue / (p.varTrue + p.varError)
     }
 
+    const assumption: Block = { t: 'note', text: 'Assume stable, equal-variance jointly normal test-retest scores, with independent measurement errors. Use the no-intervention model to predict regression; a before-and-after change does not by itself establish a causal effect.' }
+
     if (skin === 'flight') {
       if (p.level === 1) {
         return [
+          assumption,
           {
             t: 'p',
             text: `In a flight training simulator, landing precision scores across all cadet pilots follow a distribution with a mean of ${p.popMean} pts. The test-retest reliability coefficient of the flight simulator scoring algorithm is r = ${r.toFixed(2)}.`,
@@ -218,6 +220,7 @@ export const regressionSelectionEffectTemplate: Template<RegressionSelectionPara
         ]
       } else if (p.level === 2) {
         return [
+          assumption,
           {
             t: 'p',
             text: `A flight school landing evaluation model separates performance into true piloting skill variance (σ_T² = ${p.varTrue}) and random environmental measurement noise variance (σ_e² = ${p.varError}). The population baseline mean is ${p.popMean} pts.`,
@@ -233,19 +236,21 @@ export const regressionSelectionEffectTemplate: Template<RegressionSelectionPara
         ]
       } else {
         return [
+          assumption,
           {
             t: 'p',
             text: `Cadet pilots with struggling initial performance (scoring ${p.initialScore} pts on Trial 1, below the fleet average of ${p.popMean} pts) were placed in an intensive remedial landing seminar. Simulator test-retest reliability is r = ${r.toFixed(2)}. On Trial 2, the group improved to ${p.observedRetest} pts.`,
           },
           {
             t: 'p',
-            text: 'How much of the group’s score improvement (in points) is attributable purely to natural regression to the mean rather than the seminar?',
+            text: 'Under the no-intervention model, how many points of improvement are expected from regression to the mean?',
           },
         ]
       }
     } else if (skin === 'sales') {
       if (p.level === 1) {
         return [
+          assumption,
           {
             t: 'p',
             text: `Quarterly sales performance across regional commercial representatives averages ${p.popMean} pts. Because quarterly sales involve significant deal-timing variance, quarterly quota reliability is r = ${r.toFixed(2)}.`,
@@ -261,6 +266,7 @@ export const regressionSelectionEffectTemplate: Template<RegressionSelectionPara
         ]
       } else if (p.level === 2) {
         return [
+          assumption,
           {
             t: 'p',
             text: `Sales productivity tracking determines that underlying rep closing ability has variance σ_T² = ${p.varTrue}, while market volatility introduces random error variance σ_e² = ${p.varError}. The department average score is ${p.popMean} pts.`,
@@ -276,13 +282,14 @@ export const regressionSelectionEffectTemplate: Template<RegressionSelectionPara
         ]
       } else {
         return [
+          assumption,
           {
             t: 'p',
             text: `Representatives who scored in the bottom tier in Q1 (${p.initialScore} pts, compared to the company average of ${p.popMean} pts) were given mandatory sales coaching. Quota test-retest correlation is r = ${r.toFixed(2)}. In Q2, the coached representatives averaged ${p.observedRetest} pts.`,
           },
           {
             t: 'p',
-            text: 'How many points of their score gain from Q1 are accounted for solely by regression to the mean?',
+            text: 'Under the no-coaching model, how many points of improvement are expected from regression to the mean?',
           },
         ]
       }
@@ -290,6 +297,7 @@ export const regressionSelectionEffectTemplate: Template<RegressionSelectionPara
       // Default: sports
       if (p.level === 1) {
         return [
+          assumption,
           {
             t: 'p',
             text: `In athletic decathlon sprint trials, benchmark trial scores average ${p.popMean} pts across national competitors. Test-retest score reliability across independent trial sessions is r = ${r.toFixed(2)}.`,
@@ -305,6 +313,7 @@ export const regressionSelectionEffectTemplate: Template<RegressionSelectionPara
         ]
       } else if (p.level === 2) {
         return [
+          assumption,
           {
             t: 'p',
             text: `Biomechanical athletic modeling decomposes sprint trial variance into true physiological capacity variance (σ_T² = ${p.varTrue}) and random session condition variance (σ_e² = ${p.varError}). The squad average is ${p.popMean} pts.`,
@@ -320,13 +329,14 @@ export const regressionSelectionEffectTemplate: Template<RegressionSelectionPara
         ]
       } else {
         return [
+          assumption,
           {
             t: 'p',
             text: `Athletes performing poorly on Trial 1 (${p.initialScore} pts, below the squad mean of ${p.popMean} pts) were placed on a revised recovery nutrition regimen. Session reliability is r = ${r.toFixed(2)}. On Trial 2, their score rose to ${p.observedRetest} pts.`,
           },
           {
             t: 'p',
-            text: 'How many points of the observed score increase are due solely to regression to the mean?',
+            text: 'Under the no-regimen-change model, how many points of improvement are expected from regression to the mean?',
           },
         ]
       }
@@ -373,6 +383,9 @@ export const regressionSelectionEffectTemplate: Template<RegressionSelectionPara
     }
     const dev = p.initialScore - p.popMean
     const expectedRetest = p.popMean + r * dev
+    const prediction: Block[] = p.level === 3
+      ? [{ t: 'p', text: `Expected gain without intervention = ${(expectedRetest - p.initialScore).toFixed(2)} pts (${expectedRetest.toFixed(2)} − ${p.initialScore}). This is a model prediction; the observed change alone cannot identify an intervention effect.` }]
+      : []
 
     return [
       {
@@ -388,6 +401,7 @@ export const regressionSelectionEffectTemplate: Template<RegressionSelectionPara
           `Expected Follow-up Score = μ + r(X₁ − μ) = ${p.popMean} + ${r.toFixed(2)} × (${dev}) = ${expectedRetest.toFixed(2)} pts`,
         ],
       },
+      ...prediction,
     ]
   },
 }
