@@ -5,6 +5,10 @@ import { supabase } from './supabase.ts'
 export interface Profile {
   id: string
   handle: string
+  display_name: string | null
+  avatar_data_url: string | null
+  sound_enabled: boolean
+  celebrations_enabled: boolean
   age_confirmed_at: string
   terms_accepted_at: string
   pledge_accepted_at: string
@@ -50,9 +54,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data.theme) {
           document.documentElement.setAttribute('data-theme', data.theme)
         }
-        if (data.reduced_motion) {
-          document.documentElement.setAttribute('data-reduced-motion', 'true')
-        }
+        if (data.reduced_motion) document.documentElement.setAttribute('data-reduced-motion', 'true')
+        else document.documentElement.removeAttribute('data-reduced-motion')
       } else {
         setProfile(null)
       }

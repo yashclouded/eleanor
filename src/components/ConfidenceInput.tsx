@@ -51,7 +51,7 @@ export function ConfidenceInput({
         {question}
       </label>
       <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
-        Calibrate your certainty. There is no penalty for honest uncertainty.
+        Choose a percentage, or enter your own. Take your best estimate.
       </p>
 
       {/* Quick pick buttons */}

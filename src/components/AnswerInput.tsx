@@ -266,6 +266,9 @@ export function AnswerInput({
               )
             })}
           </ol>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => onChange(currentOrder)} disabled={disabled}>
+            Use this order
+          </button>
         </div>
       )
     }

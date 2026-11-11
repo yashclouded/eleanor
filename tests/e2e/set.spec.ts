@@ -134,6 +134,7 @@ async function createAndLoginUser(
 }
 
 test.describe('Task 4.2: Set Player E2E', () => {
+  let parkedItems: string[] = []
   test.beforeAll(async () => {
     await testSql`
       insert into families (id, concept_id)
@@ -165,9 +166,14 @@ test.describe('Task 4.2: Set Player E2E', () => {
         ('judgment.base-rate.screening@1#3_base', 'generated', 'judgment.base-rate.screening', 1, 3, 'judgment', 'judgment.base-rates', 'fam_base', 1800, 250, 'published', true)
       on conflict (id) do update set status = 'published'
     `
+    // Numeric input/repair fixtures must not compete with the expanded selection-format bank.
+    const parked = await testSql<{ id: string }[]>`update items set status = 'retired'
+      where track_id = 'judgment' and source_id <> 'judgment.base-rate.screening' and status = 'published' returning id`
+    parkedItems = parked.map((item) => item.id)
   })
 
   test.afterAll(async () => {
+    if (parkedItems.length) await testSql`update items set status = 'published' where id = any(${testSql.array(parkedItems)})`
     await testSql.end()
   })
 

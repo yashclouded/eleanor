@@ -124,9 +124,9 @@ test.describe('Task 4.6: Settings, Landing, and Legal pages', () => {
     await expect(page.getByText('Think first. Commit an answer and how sure you are.')).toBeVisible()
 
     // Three short explanations: rating, calibration, echoes
-    await expect(page.getByRole('heading', { name: /Rating/i })).toBeVisible()
-    await expect(page.getByRole('heading', { name: /Calibration/i })).toBeVisible()
-    await expect(page.getByRole('heading', { name: /Echoes/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'A challenge that meets you.' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Know what you know.' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Make the insight stay.' })).toBeVisible()
 
     // Honest-claims paragraph from doc.md §1
     await expect(page.getByText(/Eleanor trains and measures named skills on its own problems/i)).toBeVisible()
@@ -185,7 +185,7 @@ test.describe('Task 4.6: Settings, Landing, and Legal pages', () => {
     // Save preferences
     const saveBtn = page.getByRole('button', { name: /save preferences/i })
     await saveBtn.click()
-    await expect(page.getByText(/saved/i)).toBeVisible()
+    await expect(page.getByRole('status').filter({ hasText: 'Settings saved successfully.' })).toBeVisible()
 
     // Reload page and check persistence
     await page.reload()

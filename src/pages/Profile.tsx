@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.ts'
 import { api } from '../lib/api.ts'
 import { useAuth } from '../lib/auth.tsx'
 import { TitleBadge } from '../components/TitleBadge.tsx'
+import { Avatar } from '../components/Avatar.tsx'
 import { RatingChart } from '../components/RatingChart.tsx'
 import { ReliabilityChart } from '../components/ReliabilityChart.tsx'
 import { calibration, type CalPoint } from '../../supabase/functions/_shared/model.ts'
@@ -17,6 +18,8 @@ interface TrackStat {
 
 interface PublicProfileData {
   handle: string
+  display_name?: string | null
+  avatar_data_url?: string | null
   created_at: string
   proven_count: number
   tracks: Record<string, TrackStat>
@@ -26,7 +29,7 @@ interface PublicProfileData {
 
 export function Profile() {
   const { handle } = useParams<{ handle: string }>()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
 
   const [loading, setLoading] = useState(true)
   const [profileData, setProfileData] = useState<PublicProfileData | null>(null)
@@ -128,6 +131,7 @@ export function Profile() {
             This profile is private or does not exist.
           </p>
           <div style={{ marginTop: 'var(--space-4)' }}>
+            {profile?.handle === handle && <Link to="/settings" className="btn btn-primary btn-sm">Edit profile</Link>}
             <Link to="/leaderboard" className="btn btn-secondary btn-sm">
               Back to Leaderboard
             </Link>
@@ -181,27 +185,11 @@ export function Profile() {
         }}
       >
         <div style={{ display: 'flex', gap: 'var(--space-4)', alignItems: 'center' }}>
-          <div
-            style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              backgroundColor: 'var(--primary)',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1.75rem',
-              fontWeight: 700,
-            }}
-            aria-hidden="true"
-          >
-            {profileData.handle.charAt(0).toUpperCase()}
-          </div>
+          <Avatar name={profileData.display_name || profileData.handle} photo={profileData.avatar_data_url} large />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
               <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>
-                @{profileData.handle}
+                {profileData.display_name || `@${profileData.handle}`}
               </h1>
               <TitleBadge rating={highestRating} />
               {isWellCalibrated && (
@@ -214,6 +202,7 @@ export function Profile() {
                 </span>
               )}
             </div>
+            {profileData.display_name && <p className="field-help">@{profileData.handle}</p>}
             <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: 'var(--space-1)' }}>
               Member since {joinDate} · {profileData.proven_count} Proven Concept{profileData.proven_count === 1 ? '' : 's'}
             </div>
@@ -221,13 +210,13 @@ export function Profile() {
         </div>
 
         <div>
-          <button
+          {profile?.handle === profileData.handle ? <Link to="/settings" className="btn btn-secondary btn-sm">Edit profile</Link> : <button
             type="button"
             className="btn btn-secondary btn-sm"
             onClick={() => setShowReport(!showReport)}
           >
             {showReport ? 'Cancel Report' : 'Report'}
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -260,7 +249,7 @@ export function Profile() {
           ) : (
             <form onSubmit={handleReportSubmit}>
               <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
-                Please provide clear reasons for this report (5–1000 characters). Outcome reports are evaluated manually; automated cheating detection runs independently.
+                Please provide clear reasons for this report (5–1000 characters). Reports are reviewed manually alongside outcome statistics.
               </p>
               {reportError && (
                 <div style={{ color: 'var(--danger, #ef4444)', fontSize: '0.875rem', marginBottom: 'var(--space-2)' }}>

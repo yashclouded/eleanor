@@ -3,6 +3,7 @@ import type { Block, Tolerance } from '../../supabase/functions/_shared/content/
 import { PromptBlocks } from './PromptBlocks.tsx'
 import { api } from '../lib/api.ts'
 import { useAction } from '../lib/useAction.ts'
+import { useAnswerFeedback } from './Experience.tsx'
 
 export interface RepairStepData {
   index: number
@@ -25,6 +26,7 @@ export function RepairLadder({
   onStepComplete,
   onRevealClick,
 }: RepairLadderProps) {
+  const feedback = useAnswerFeedback()
   const [answer, setAnswer] = useState('')
   const [stepFeedback, setStepFeedback] = useState<{
     correct: boolean
@@ -53,12 +55,14 @@ export function RepairLadder({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!answer.trim()) return
+    feedback.prepare()
 
     try {
       const res = await repairAction.run({
         stepIndex: currentStep.index,
         answer: answer.trim(),
       })
+      feedback.celebrate(`${attemptId}/repair/${currentStep.index}`, res.correct)
       setStepFeedback(res)
     } catch {
       // Error handled by repairAction.error

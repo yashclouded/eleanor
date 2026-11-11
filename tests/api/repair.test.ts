@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest'
-import { call, createTestUser, createUserClient, testSql } from './helpers.ts'
+import { answerInput, call, createTestUser, createUserClient, testSql } from './helpers.ts'
 
 describe('API: Repair ladder, reveal and playbook', () => {
   afterAll(async () => {
@@ -67,7 +67,7 @@ describe('API: Repair ladder, reveal and playbook', () => {
       `/attempts/${attempt.id}/commit`,
       {
         transitionId: crypto.randomUUID(),
-        answer: String(sec.answer),
+        answer: answerInput(sec.answer),
         confidence: 0.9,
         declaredHelp: false,
       },
@@ -294,11 +294,11 @@ describe('API: Repair ladder, reveal and playbook', () => {
     await testSql`
       update echoes
       set due_at = now() - interval '1 hour'
-      where user_id = ${user.user.id} and family_id = ${attempt1.familyId ?? 'base-rate-screening'}
+      where user_id = ${user.user.id} and source_attempt_id = ${attempt1.id}
     `
     await testSql`
       update attempts
-      set resolved_at = now() - interval '2 hours'
+      set presented_at = now() - interval '2 hours', resolved_at = now() - interval '2 hours'
       where id = ${attempt1.id}
     `
 

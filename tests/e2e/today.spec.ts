@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
+import { enterAnswer } from './release-helpers.ts'
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321'
 const SUPABASE_SECRET_KEY =
@@ -202,7 +203,7 @@ test.describe('Task 4.3: Today and Daily Crux Pages E2E', () => {
   test('2. After one rated attempt, Today shows Placement 1/8 and weekly dots count 1 distinct day', async ({
     page,
   }) => {
-    await createAndLoginUser(page, { tracks: ['judgment'], weeklyGoal: 3 })
+    const { userId } = await createAndLoginUser(page, { tracks: ['judgment'], weeklyGoal: 3 })
 
     // Start a set from Today
     const startBtn = page.getByRole('button', { name: /start.*judgment/i })
@@ -214,8 +215,10 @@ test.describe('Task 4.3: Today and Daily Crux Pages E2E', () => {
     await expect(page.getByTestId('presented-state')).toBeVisible()
 
     // Answer and commit 1 problem
-    const answerInput = page.locator('#answer-input')
-    await answerInput.fill('8.3')
+    const [attempt] = await testSql`select i.answer_spec, s.answer from attempts a
+      join instances i on i.id = a.instance_id join instance_secrets s on s.instance_id = a.instance_id
+      where a.user_id = ${userId} order by a.presented_at desc limit 1`
+    await enterAnswer(page, attempt.answer_spec, attempt.answer)
 
     const confBtn = page.getByRole('button', { name: '80%' })
     await confBtn.click()
@@ -249,7 +252,7 @@ test.describe('Task 4.3: Today and Daily Crux Pages E2E', () => {
   test('3. Daily Crux: problem presentation, commit, crowd stats appear, share text has no answer value, and card on Today shows solved', async ({
     page,
   }) => {
-    await createAndLoginUser(page, { tracks: ['judgment', 'logic'] })
+    const { userId } = await createAndLoginUser(page, { tracks: ['judgment', 'logic'] })
 
     // Navigate to /daily
     await page.goto('/daily')
@@ -259,18 +262,10 @@ test.describe('Task 4.3: Today and Daily Crux Pages E2E', () => {
     await expect(page.getByTestId('prompt-blocks')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Commit' })).toBeDisabled()
 
-    // Fill answer according to input type
-    const textInput = page.locator('#answer-input')
-    const checkbox = page.locator('input[type="checkbox"]').first()
-    const radio = page.locator('input[type="radio"]').first()
-
-    if (await textInput.isVisible().catch(() => false)) {
-      await textInput.fill('8.3')
-    } else if (await checkbox.isVisible().catch(() => false)) {
-      await checkbox.click()
-    } else if (await radio.isVisible().catch(() => false)) {
-      await radio.click()
-    }
+    const [attempt] = await testSql`select i.answer_spec, s.answer from attempts a
+      join instances i on i.id = a.instance_id join instance_secrets s on s.instance_id = a.instance_id
+      where a.user_id = ${userId} and a.set_id is null order by a.presented_at desc limit 1`
+    await enterAnswer(page, attempt.answer_spec, attempt.answer)
 
     await page.getByRole('button', { name: '80%' }).click()
     const commitBtn = page.getByRole('button', { name: 'Commit' })

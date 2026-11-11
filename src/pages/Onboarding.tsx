@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth.tsx'
 import { api, ApiError } from '../lib/api.ts'
 import { useAction } from '../lib/useAction.ts'
 import { parseAnswer, isCorrect } from '../../supabase/functions/_shared/grading.ts'
 import type { AnswerSpec } from '../../supabase/functions/_shared/content/types.ts'
+import { useAnswerFeedback } from '../components/Experience.tsx'
 
 interface OnboardingData {
   ageConfirmed: boolean
@@ -21,6 +22,8 @@ const STORAGE_KEY = 'eleanor_onboarding_draft'
 export function Onboarding() {
   const navigate = useNavigate()
   const { refreshProfile } = useAuth()
+  const feedback = useAnswerFeedback()
+  const tutorialId = useRef(crypto.randomUUID())
 
   const [step, setStep] = useState<number>(() => {
     try {
@@ -121,6 +124,8 @@ export function Onboarding() {
       return
     }
     const correct = isCorrect(spec, 60, parsed.value)
+    feedback.prepare()
+    feedback.celebrate(`${tutorialId.current}/1`, correct)
     if (correct) {
       setTut1Feedback(
         `Correct! Notice that if you knew 15 × 4 is 60, your confidence should be high (90%–100%), even though 60 is just a number.`
@@ -145,6 +150,8 @@ export function Onboarding() {
       return
     }
     const correct = isCorrect(spec, 'no', parsed.value)
+    feedback.prepare()
+    feedback.celebrate(`${tutorialId.current}/2`, correct)
     if (correct) {
       setTut2Feedback(
         `Exactly! The probability of rolling 11 is 0%. But your confidence that the answer is "no" should be 100%! Confidence measures your certainty in your own answer, NOT the event probability.`
@@ -157,6 +164,9 @@ export function Onboarding() {
   return (
     <div className="container-problem" style={{ marginTop: 'var(--space-8)' }}>
       <div className="form-card" data-testid={`onboarding-step-${step}`}>
+        <div className="onboarding-progress" role="progressbar" aria-label="Setting up your practice" aria-valuemin={0} aria-valuemax={6} aria-valuenow={step}>
+          {Array.from({ length: 6 }, (_, i) => <span key={i} className={i < step ? 'complete' : ''} />)}
+        </div>
         {/* Step indicator */}
         <div
           style={{
@@ -433,17 +443,17 @@ export function Onboarding() {
                   {
                     id: 'steady',
                     name: 'Steady',
-                    desc: '65% target accuracy (more reinforcement, gradual difficulty curve)',
+                    desc: '80% target accuracy (more reinforcement, gradual difficulty curve)',
                   },
                   {
                     id: 'balanced',
                     name: 'Balanced',
-                    desc: '50% target accuracy (optimal learning rate, standard challenge)',
+                    desc: '70% target accuracy (standard challenge)',
                   },
                   {
                     id: 'stretch',
                     name: 'Stretch',
-                    desc: '35% target accuracy (steep difficulty, high challenge)',
+                    desc: '55% target accuracy (steep difficulty, high challenge)',
                   },
                 ].map((i) => {
                   const checked = data.intensity === i.id

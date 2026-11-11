@@ -4,6 +4,8 @@ import { useAuth } from '../lib/auth.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { api, type AttemptView } from '../lib/api.ts'
 import { TitleBadge } from '../components/TitleBadge.tsx'
+import { Icon } from '../components/Icon.tsx'
+import { TrackArt } from '../components/TrackArt.tsx'
 import {
   inflate,
   isProvisional,
@@ -203,186 +205,63 @@ export function Today() {
   }
 
   return (
-    <div className="container-dashboard" data-testid="today-container">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-6)' }}>
-        <div>
-          <h1 style={{ fontSize: '1.75rem', marginBottom: 'var(--space-1)' }}>
-            Welcome back, {profile?.handle ?? 'Learner'}
-          </h1>
-          <p style={{ color: 'var(--text-muted)' }}>
-            Your daily training session, active tracks, and retention reviews.
-          </p>
+    <div className="container-dashboard today-page" data-testid="today-container">
+      <header className="page-heading">
+        <div><span className="eyebrow">YOUR DAILY PRACTICE</span><h1>A little further today.</h1><p>Welcome back, {profile?.handle ?? 'Learner'}. Make some room for a good problem.</p></div>
+        <span className="today-date">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+      </header>
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
+      <div className="today-layout">
+        <div className="practice-column">
+          <section className="practice-feature" aria-labelledby="practice-title">
+            <div className="practice-feature-copy"><span className="eyebrow">A MOMENT OF FOCUS</span><h2 id="practice-title">Good thinking<br />is a practice.</h2><p>One problem at a time. No rush.<br />See where your curiosity takes you.</p><a href="#tracks-heading" className="btn btn-light">Choose your practice <Icon name="arrow" /></a></div>
+            <TrackArt track="judgment" />
+            <span className="feature-caption">THINK. COMMIT. DISCOVER.</span>
+          </section>
+          <section aria-labelledby="tracks-heading" className="tracks-section">
+            <div className="section-heading"><div><span className="eyebrow">FOLLOW YOUR CURIOSITY</span><h2 id="tracks-heading" tabIndex={-1}>Your tracks</h2></div><Link to="/progress" className="text-link">View progress <Icon name="arrow" /></Link></div>
+            {loading ? (
+              <div className="tracks-grid" role="status" aria-label="Loading track details">{tracks.map((track) => <div key={track} className="track-skeleton skeleton"><span /><span /><span /></div>)}</div>
+            ) : (
+              <div className="tracks-grid">
+                {tracks.map((track) => {
+                  const tr = trackRatings.get(track)
+                  const rating = tr?.rating ?? 1200
+                  const rd = tr?.rd ?? 350
+                  const lastAt = tr?.last_at ? new Date(tr.last_at) : null
+                  const n = tr?.n ?? 0
+                  const provisional = isProvisional(inflate({ r: rating, rd, lastAt }, new Date()).rd)
+                  const displayRating = `${Math.round(rating)}${provisional ? '?' : ''}`
+                  const openSetId = openSets.get(track)
+                  return (
+                    <article key={track} className={`track-card discipline-${track}`} data-testid={`track-card-${track}`}>
+                      <div className="track-art-panel"><TrackArt track={track} /></div>
+                      <div className="track-content"><div className="track-card-header"><h3 className="track-card-title">{track}</h3><TitleBadge title={getTitle(rating)} /></div>
+                        <p className="track-description">{track === 'judgment' ? 'Make sense of uncertainty.' : track === 'logic' ? 'Find what follows.' : track === 'math' ? 'See the underlying pattern.' : 'Turn an idea into a solution.'}</p>
+                        <div className="track-rating-row"><span className="track-rating-value">{displayRating}</span><span className="rating-caption">{provisional ? 'Provisional rating' : 'Track rating'}</span></div>
+                        <div className="track-progress-row">{n < 8 ? <><span className="placement-badge">Placement {n}/8</span><div className="placement-dots" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <span key={i} className={i < n ? 'complete' : ''} />)}</div></> : <span>{n} rated {n === 1 ? 'attempt' : 'attempts'}</span>}</div>
+                        <button type="button" className="btn btn-secondary track-start" onClick={() => openSetId ? handleResumeSet(openSetId) : handleStartSet(track)} disabled={startingTrack !== null} aria-label={`${openSetId ? 'Resume' : 'Start'} ${track} set`}><span>{startingTrack === track ? 'Starting...' : openSetId ? 'Continue practice' : 'Start practice'}</span><Icon name="arrow" /></button>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            )}
+          </section>
         </div>
+        <aside className="today-sidebar" aria-label="Daily summary">
+          <section className="weekly-card dashboard-card" data-testid="weekly-goal-card">
+            <div className="section-heading"><h2 className="dashboard-card-title">Your weekly rhythm</h2><Icon name="today" /></div>
+            <div className="weekly-ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="51" className="ring-track" /><circle cx="60" cy="60" r="51" className="ring-value" pathLength="100" strokeDasharray={`${loading ? 0 : Math.min(100, distinctActiveDays / weeklyGoal * 100)} 100`} /></svg><div><strong>{loading ? '—' : distinctActiveDays}<span> / {weeklyGoal}</span></strong><span>practice days</span></div></div>
+            <div className="weekly-dots" data-testid="weekly-dots" role="group" aria-label={`Weekly goal: ${distinctActiveDays} of ${weeklyGoal} days completed`}>{Array.from({ length: Math.max(weeklyGoal, distinctActiveDays) }, (_, i) => <span key={i} data-testid={i < distinctActiveDays ? 'weekly-dot-filled' : 'weekly-dot'} className={`weekly-dot ${i < distinctActiveDays ? 'filled' : 'empty'}`} role="img" aria-label={`Day ${i + 1}: ${i < distinctActiveDays ? 'completed' : 'not completed'}`}>{i < distinctActiveDays && <Icon name="check" />}</span>)}</div>
+            <p>{distinctActiveDays >= weeklyGoal ? 'Your goal is complete. Enjoy the space you made.' : 'A little consistency goes a long way.'}</p><span className="sidebar-footnote">Your goal: {weeklyGoal} days this week</span>
+          </section>
+          <section className="daily-card dashboard-card" data-testid="daily-crux-card"><div className="section-heading"><span className="sidebar-icon"><Icon name="daily" /></span><span data-testid="daily-status" className={`status-badge ${dailySolved ? 'solved' : 'unsolved'}`}>{dailySolved ? 'Solved' : 'Unsolved'}</span></div><span className="eyebrow">ONE PROBLEM. EVERYONE.</span><h2>{dailyNumber !== null ? `Daily Crux #${dailyNumber}` : 'The Daily Crux'}</h2><p>A fresh perspective, shared with the world. Unrated and open to everyone.</p><Link to="/daily" data-testid="daily-card-link" className="text-link">{dailySolved ? 'View results' : "Play today's Crux"}<Icon name="arrow" /></Link></section>
+          <section className="echo-card dashboard-card" data-testid="due-echoes-card"><span className="sidebar-icon"><Icon name="echo" /></span><h2 className="dashboard-card-title">Let the insight echo.</h2><strong className="echo-count" data-testid="due-echoes-count">{loading ? '—' : dueEchoCount} due</strong><p>{dueEchoCount > 0 ? 'A fresh problem, a familiar idea. Your reviews are included in your next set.' : 'All quiet for now. Fresh reviews will find their way into your practice.'}</p><span className="sidebar-footnote">Built into your training sets</span></section>
+          <Link className="sidebar-playbook" to="/playbook"><Icon name="book" /><span>Your playbook<small>Keep the ideas that click.</small></span><Icon name="arrow" /></Link>
+        </aside>
       </div>
-
-      {error && (
-        <div className="alert alert-error" role="alert" style={{ marginBottom: 'var(--space-4)' }}>
-          {error}
-        </div>
-      )}
-
-      {/* Top 3 Summary Cards: Weekly Goal, Daily Crux, Due Echoes */}
-      <section className="dashboard-grid" aria-label="Daily summary">
-        {/* 1. Weekly Goal Dots Card */}
-        <div className="dashboard-card" data-testid="weekly-goal-card">
-          <div>
-            <h2 className="dashboard-card-title">Weekly Goal</h2>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>
-              {distinctActiveDays} / {weeklyGoal} days
-            </div>
-            <div
-              className="weekly-dots"
-              data-testid="weekly-dots"
-              aria-label={`Weekly goal: ${distinctActiveDays} of ${weeklyGoal} days completed`}
-            >
-              {Array.from({ length: Math.max(weeklyGoal, distinctActiveDays) }).map((_, i) => {
-                const isFilled = i < distinctActiveDays
-                return (
-                  <span
-                    key={i}
-                    data-testid={isFilled ? 'weekly-dot-filled' : 'weekly-dot'}
-                    className={`weekly-dot ${isFilled ? 'filled' : 'empty'}`}
-                    aria-label={`Day ${i + 1}: ${isFilled ? 'completed' : 'not completed'}`}
-                  />
-                )
-              })}
-            </div>
-          </div>
-          <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', margin: 0 }}>
-            Training days completed this local week.
-          </p>
-        </div>
-
-        {/* 2. Daily Crux Card */}
-        <div className="dashboard-card" data-testid="daily-crux-card">
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
-              <h2 className="dashboard-card-title">Daily Crux</h2>
-              <span
-                data-testid="daily-status"
-                className={`status-badge ${dailySolved ? 'solved' : 'unsolved'}`}
-              >
-                {dailySolved ? 'Solved' : 'Unsolved'}
-              </span>
-            </div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text)', marginBottom: 'var(--space-2)' }}>
-              {dailyNumber !== null ? `Daily Crux #${dailyNumber}` : "Today's Crux"}
-            </div>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 'var(--space-4)' }}>
-              One global problem per day. Unrated reasoning puzzle with crowd statistics.
-            </p>
-          </div>
-          <Link
-            to="/daily"
-            data-testid="daily-card-link"
-            className="btn btn-secondary btn-sm"
-            style={{ width: 'fit-content' }}
-          >
-            {dailySolved ? 'View results' : "Play today's Crux"}
-          </Link>
-        </div>
-
-        {/* 3. Due Echoes Card */}
-        <div className="dashboard-card" data-testid="due-echoes-card">
-          <div>
-            <h2 className="dashboard-card-title">Due Echoes</h2>
-            <div
-              data-testid="due-echoes-count"
-              style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text)', marginBottom: 'var(--space-2)' }}
-            >
-              {dueEchoCount} due
-            </div>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-              Spaced retrieval reviews scheduled to verify retention and prove concepts.
-            </p>
-          </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-            Included automatically in your training sets.
-          </span>
-        </div>
-      </section>
-
-      {/* Tracks Training Section */}
-      <section aria-labelledby="tracks-heading" style={{ marginBottom: 'var(--space-8)' }}>
-        <h2 id="tracks-heading" style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: 'var(--space-4)' }}>
-          Your Tracks
-        </h2>
-
-        {loading ? (
-          <p style={{ color: 'var(--text-muted)' }}>Loading track details...</p>
-        ) : (
-          <div className="tracks-grid">
-            {tracks.map((track) => {
-              const tr = trackRatings.get(track)
-              const rating = tr?.rating ?? 1200
-              const rd = tr?.rd ?? 350
-              const lastAt = tr?.last_at ? new Date(tr.last_at) : null
-              const n = tr?.n ?? 0
-
-              const effectiveRd = inflate({ r: rating, rd, lastAt }, new Date()).rd
-              const provisional = isProvisional(effectiveRd)
-              const titleName = getTitle(rating)
-              const displayRating = provisional ? `${Math.round(rating)}?` : `${Math.round(rating)}`
-              const isPlacement = n < 8
-
-              const openSetId = openSets.get(track)
-
-              return (
-                <div key={track} className="track-card" data-testid={`track-card-${track}`}>
-                  <div className="track-card-header">
-                    <span className="track-card-title">{track}</span>
-                    <TitleBadge title={titleName} />
-                  </div>
-
-                  <div className="track-card-body">
-                    <div className="track-rating-row">
-                      <span className="track-rating-value">{displayRating}</span>
-                      {provisional && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-                          (provisional)
-                        </span>
-                      )}
-                    </div>
-
-                    {isPlacement ? (
-                      <div style={{ marginTop: 'var(--space-2)' }}>
-                        <span className="placement-badge">Placement {n}/8</span>
-                      </div>
-                    ) : (
-                      <div style={{ marginTop: 'var(--space-2)', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                        {n} rated {n === 1 ? 'attempt' : 'attempts'}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="track-card-actions">
-                    {openSetId ? (
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => handleResumeSet(openSetId)}
-                        aria-label={`Resume ${track} set`}
-                      >
-                        Resume {track} set
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => handleStartSet(track)}
-                        disabled={startingTrack !== null}
-                        aria-label={`Start ${track} set`}
-                      >
-                        {startingTrack === track ? 'Starting...' : `Start ${track} set`}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </section>
+      <div className="dashboard-footer"><span className="small-dot" /><p>Progress is what you can do again. Give it time.</p></div>
     </div>
   )
 }

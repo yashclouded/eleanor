@@ -1,4 +1,5 @@
 import type { AttemptView } from '../lib/api.ts'
+import { Icon } from './Icon.tsx'
 
 interface ResultPanelProps {
   result: NonNullable<AttemptView['result']>
@@ -25,7 +26,7 @@ export function ResultPanel({ result, ratingReveal = 'end_of_set' }: ResultPanel
         marginTop: 'var(--space-6)',
         padding: 'var(--space-5)',
         background: isCorrect ? 'var(--success-bg)' : isGaveUp ? 'var(--surface-hover)' : 'var(--error-bg)',
-        border: `1px solid ${isCorrect ? '#86efac' : isGaveUp ? 'var(--border)' : 'var(--error-border)'}`,
+        border: `1px solid ${isCorrect ? 'var(--success)' : isGaveUp ? 'var(--border)' : 'var(--error-border)'}`,
         borderRadius: 'var(--radius-lg)',
       }}
       role="region"
@@ -46,17 +47,17 @@ export function ResultPanel({ result, ratingReveal = 'end_of_set' }: ResultPanel
         >
           {isCorrect && (
             <>
-              <span aria-hidden="true">✓</span> Correct
+              <Icon name="check" /> Correct
             </>
           )}
           {!isCorrect && !isGaveUp && (
             <>
-              <span aria-hidden="true">✗</span> Incorrect
+              <Icon name="close" /> Incorrect
             </>
           )}
           {isGaveUp && (
             <>
-              <span aria-hidden="true">⚐</span> Gave up
+              <Icon name="flag" /> Gave up
             </>
           )}
         </span>

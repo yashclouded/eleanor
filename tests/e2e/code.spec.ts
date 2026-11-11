@@ -3,6 +3,7 @@ import AxeBuilder from '@axe-core/playwright'
 import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
 import http from 'node:http'
+import { CODE_PROBLEMS } from '../../supabase/functions/_shared/registry.ts'
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321'
 const SUPABASE_SECRET_KEY =
@@ -387,17 +388,21 @@ test.describe('Task 5.3: Code UI E2E', () => {
     await expect(submitBtn).toBeVisible()
     await expect(submitBtn).toHaveText('Submit')
 
-    // 6. Submit with confidence: Wrong answer on group 3 ('overflow')
+    // 6. Submit with confidence: fail a known group of the selected problem.
     // Next submit is STILL rated!
+    const setId = new URL(page.url()).pathname.split('/').at(-1)!
+    const [attempt] = await testSql`select item_id from attempts where set_id = ${setId} order by slot limit 1`
     const testGroups = await testSql<{ group_idx: number; label: string; fingerprint: string; expected: string }[]>`
       select group_idx, label, fingerprint, expected
       from code_tests
-      where item_id = 'code.prefix.range-sums@1#1'
+      where item_id = ${attempt.item_id}
       order by group_idx asc
     `
+    expect(testGroups.length).toBeGreaterThan(0)
+    const failedIndex = Math.min(3, testGroups.length - 1)
 
     nextBatchResponses = testGroups.map((g, idx) => {
-      if (idx === 3) {
+      if (idx === failedIndex) {
         return {
           status: { id: 4, description: 'Wrong Answer' },
           stdout: 'wrong_overflow_output\n',
@@ -419,9 +424,9 @@ test.describe('Task 5.3: Code UI E2E', () => {
 
     // Verify failing test group fingerprint is displayed
     const failedLabel = page.getByTestId('failed-group-label')
-    await expect(failedLabel).toHaveText('overflow')
+    await expect(failedLabel).toHaveText(testGroups[failedIndex].label)
     const failedFingerprint = page.getByTestId('failed-group-fingerprint')
-    await expect(failedFingerprint).toContainText('32-bit integer overflow beyond 2^31')
+    await expect(failedFingerprint).toHaveText(`Fingerprint: ${testGroups[failedIndex].fingerprint}`)
 
     // Because this was the first non-compile submission, it was rated (no unrated badge yet)
     await expect(page.getByTestId('unrated-badge')).toHaveCount(0)
@@ -465,7 +470,9 @@ test.describe('Task 5.3: Code UI E2E', () => {
 
     // Editorial section
     await expect(page.getByTestId('editorial-section')).toBeVisible()
-    await expect(page.getByTestId('editorial-section')).toContainText('Prefix sums')
+    const problem = CODE_PROBLEMS.find((problem) => attempt.item_id === `${problem.id}@${problem.version}#1`)!
+    const paragraph = problem.editorial.find((block) => block.t === 'p')!
+    await expect(page.getByTestId('editorial-section')).toContainText(paragraph.text)
 
     // Reference solutions section with tabs
     await expect(page.getByTestId('reference-solutions-section')).toBeVisible()

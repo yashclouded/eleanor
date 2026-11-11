@@ -9,7 +9,9 @@ import {
   useLocation,
 } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth.tsx'
-import { TitleBadge } from './components/TitleBadge.tsx'
+import { BrandMark, Icon } from './components/Icon.tsx'
+import { Avatar } from './components/Avatar.tsx'
+import { ExperienceProvider } from './components/Experience.tsx'
 import { Landing } from './pages/Landing.tsx'
 import { Login } from './pages/Login.tsx'
 import { Onboarding } from './pages/Onboarding.tsx'
@@ -21,16 +23,16 @@ import { Playbook } from './pages/Playbook.tsx'
 import { Leaderboard } from './pages/Leaderboard.tsx'
 import { Profile } from './pages/Profile.tsx'
 import { Settings } from './pages/Settings.tsx'
-import { Admin } from './pages/Admin.tsx'
 import { Terms } from './pages/Terms.tsx'
 import { Privacy } from './pages/Privacy.tsx'
 import { Legal } from './pages/Legal.tsx'
+
+const Admin = React.lazy(() => import('./pages/Admin.tsx').then((module) => ({ default: module.Admin })))
 
 function TopBar() {
   const { session, profile, signOut } = useAuth()
   const location = useLocation()
 
-  // During onboarding, simplify top bar to avoid navigation interruptions
   const isOnboarding = location.pathname === '/onboarding'
 
   return (
@@ -41,7 +43,8 @@ function TopBar() {
           className="logo-text"
           aria-label="Eleanor Home"
         >
-          Eleanor
+          <BrandMark />
+          <span>eleanor<span className="brand-period">.</span></span>
         </Link>
 
         {session && profile && !isOnboarding && (
@@ -52,7 +55,7 @@ function TopBar() {
                   to="/today"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  Today
+                  <Icon name="today" /><span>Today</span>
                 </NavLink>
               </li>
               <li>
@@ -60,7 +63,7 @@ function TopBar() {
                   to="/daily"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  Daily
+                  <Icon name="daily" /><span>Daily</span>
                 </NavLink>
               </li>
               <li>
@@ -68,7 +71,7 @@ function TopBar() {
                   to="/progress"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  Progress
+                  <Icon name="progress" /><span>Progress</span>
                 </NavLink>
               </li>
               <li>
@@ -76,7 +79,7 @@ function TopBar() {
                   to="/leaderboard"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  Leaderboard
+                  <Icon name="leaderboard" /><span>Leaderboard</span>
                 </NavLink>
               </li>
               <li>
@@ -84,7 +87,7 @@ function TopBar() {
                   to="/settings"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  Settings
+                  <Icon name="settings" /><span>Settings</span>
                 </NavLink>
               </li>
             </ul>
@@ -94,16 +97,17 @@ function TopBar() {
 
       <div className="top-bar-right">
         {session ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <div className="profile-controls">
             {profile && (
               <>
                 <Link
                   to={`/u/${profile.handle}`}
-                  style={{ textDecoration: 'none', color: 'var(--text)', fontWeight: 600, fontSize: '0.875rem' }}
+                  className="profile-link"
+                  aria-label={`View @${profile.handle}'s profile`}
                 >
-                  @{profile.handle}
+                  <Avatar name={profile.display_name || profile.handle} photo={profile.avatar_data_url} />
+                  <span className="profile-handle">{profile.display_name || `@${profile.handle}`}</span>
                 </Link>
-                <TitleBadge title="Novice" />
               </>
             )}
             <button
@@ -116,9 +120,7 @@ function TopBar() {
             </button>
           </div>
         ) : (
-          <Link to="/login" className="btn btn-primary btn-sm">
-            Sign in
-          </Link>
+          <><nav className="public-nav" aria-label="Explore Eleanor"><a href="/#sample">The practice</a><Link to="/leaderboard">Leaderboard</Link></nav><Link to="/login" className="btn btn-primary btn-sm">Sign in <Icon name="arrow" /></Link></>
         )}
       </div>
     </header>
@@ -202,7 +204,7 @@ export function AppContent() {
             <Route path="/leaderboard/:track" element={<Leaderboard />} />
             <Route path="/u/:handle" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={<React.Suspense fallback={<p role="status">Loading admin…</p>}><Admin /></React.Suspense>} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/legal" element={<Legal />} />
@@ -219,7 +221,7 @@ export function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppContent />
+        <ExperienceProvider><AppContent /></ExperienceProvider>
       </AuthProvider>
     </BrowserRouter>
   )

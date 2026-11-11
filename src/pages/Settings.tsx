@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { api, ApiError } from '../lib/api.ts'
+import { ProfileEditor } from '../components/ProfileEditor.tsx'
 
 export function Settings() {
   const { session, profile, refreshProfile, signOut } = useAuth()
   const navigate = useNavigate()
+  const initializedProfileId = useRef<string | null>(null)
 
   // Form states for direct RLS profile preferences
   const [intensity, setIntensity] = useState<'steady' | 'balanced' | 'stretch'>('balanced')
@@ -15,6 +17,8 @@ export function Settings() {
   const [leaderboardVisible, setLeaderboardVisible] = useState<boolean>(true)
   const [theme, setTheme] = useState<'system' | 'light' | 'dark'>('system')
   const [reducedMotion, setReducedMotion] = useState<boolean>(false)
+  const [soundEnabled, setSoundEnabled] = useState(true)
+  const [celebrationsEnabled, setCelebrationsEnabled] = useState(true)
   const [weeklyGoal, setWeeklyGoal] = useState<number>(3)
   const [tracks, setTracks] = useState<string[]>(['judgment', 'logic'])
 
@@ -38,15 +42,18 @@ export function Settings() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
-  // Initialize from existing profile
+  // A profile save must not replace pending edits in the separate preferences form.
   useEffect(() => {
-    if (profile) {
+    if (profile && initializedProfileId.current !== profile.id) {
+      initializedProfileId.current = profile.id
       if (profile.intensity) setIntensity(profile.intensity)
       if (profile.set_size) setSetSize(profile.set_size)
       if (profile.rating_reveal) setRatingReveal(profile.rating_reveal)
       if (profile.leaderboard_visible !== undefined) setLeaderboardVisible(profile.leaderboard_visible)
       if (profile.theme) setTheme(profile.theme)
       if (profile.reduced_motion !== undefined) setReducedMotion(profile.reduced_motion)
+      setSoundEnabled(profile.sound_enabled ?? true)
+      setCelebrationsEnabled(profile.celebrations_enabled ?? true)
       if (profile.weekly_goal) setWeeklyGoal(profile.weekly_goal)
       if (profile.tracks && profile.tracks.length > 0) setTracks(profile.tracks)
       setNewHandle(profile.handle)
@@ -80,6 +87,8 @@ export function Settings() {
           leaderboard_visible: leaderboardVisible,
           theme,
           reduced_motion: reducedMotion,
+          sound_enabled: soundEnabled,
+          celebrations_enabled: celebrationsEnabled,
           weekly_goal: weeklyGoal,
           tracks,
         })
@@ -221,7 +230,7 @@ export function Settings() {
   }
 
   return (
-    <div className="container-problem" style={{ paddingBottom: 'var(--space-12)' }}>
+    <div className="container-problem settings-page" style={{ paddingBottom: 'var(--space-12)' }}>
       <header style={{ marginBottom: 'var(--space-6)' }}>
         <h1 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: 'var(--space-2)' }}>
           Settings
@@ -230,6 +239,8 @@ export function Settings() {
           Manage your practice flow, presentation, privacy, and account data.
         </p>
       </header>
+
+      <ProfileEditor key={profile.id} />
 
       {/* Main preferences form (Direct RLS updates on profiles) */}
       <form onSubmit={handleSavePreferences} style={{ marginBottom: 'var(--space-8)' }}>
@@ -245,7 +256,7 @@ export function Settings() {
               Target Intensity
             </legend>
             <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
-              Controls the target success rate used by the adaptive item selection model.
+              Choose how often you want to succeed as the problems adapt to you.
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3)' }}>
               <label className={`choice-card ${intensity === 'steady' ? 'is-selected' : ''}`}>
@@ -272,7 +283,7 @@ export function Settings() {
                 />
                 <div>
                   <div className="choice-title">Balanced (70%)</div>
-                  <div className="choice-description">Optimal challenge and learning efficiency.</div>
+                  <div className="choice-description">A mix of familiar ground and new challenges.</div>
                 </div>
               </label>
 
@@ -300,7 +311,7 @@ export function Settings() {
             <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
               Number of problems per practice set.
             </p>
-            <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+            <div className="settings-choice-row">
               {[3, 5, 8].map((size) => (
                 <label key={size} className={`choice-card ${setSize === size ? 'is-selected' : ''}`} style={{ flex: 1 }}>
                   <input
@@ -421,7 +432,7 @@ export function Settings() {
             <legend style={{ fontWeight: 600, fontSize: '0.9375rem', marginBottom: 'var(--space-2)', color: 'var(--text)' }}>
               Theme
             </legend>
-            <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+            <div className="settings-choice-row">
               {(['system', 'light', 'dark'] as const).map((t) => (
                 <label key={t} className={`choice-card ${theme === t ? 'is-selected' : ''}`} style={{ flex: 1 }}>
                   <input
@@ -440,6 +451,16 @@ export function Settings() {
           </fieldset>
 
           {/* Reduced Motion */}
+          <div className="feedback-preferences">
+            <label className={`choice-card ${soundEnabled ? 'is-selected' : ''}`}>
+              <input type="checkbox" checked={soundEnabled} onChange={(event) => setSoundEnabled(event.target.checked)} />
+              <div><div className="choice-title">Sound effects</div><div className="choice-description">A short, quiet chime after a correct answer.</div></div>
+            </label>
+            <label className={`choice-card ${celebrationsEnabled ? 'is-selected' : ''}`}>
+              <input type="checkbox" checked={celebrationsEnabled} onChange={(event) => setCelebrationsEnabled(event.target.checked)} />
+              <div><div className="choice-title">Answer celebrations</div><div className="choice-description">A brief confetti burst. Always off with reduced motion.</div></div>
+            </label>
+          </div>
           <div style={{ marginBottom: 'var(--space-6)' }}>
             <label className={`choice-card ${reducedMotion ? 'is-selected' : ''}`}>
               <input
@@ -537,10 +558,12 @@ export function Settings() {
               className="form-input"
               style={{ width: '240px' }}
               minLength={3}
-              maxLength={24}
-              pattern="^[a-zA-Z0-9_]+$"
+              maxLength={20}
+              pattern="[a-z0-9_]{3,20}"
+              aria-describedby="settings-handle-help"
               required
             />
+            <p id="settings-handle-help" className="field-help">3–20 lowercase letters, numbers or underscores.</p>
           </div>
           <button
             type="submit"

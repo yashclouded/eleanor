@@ -20,7 +20,6 @@ export function LegalDraftBanner() {
       }}
       role="alert"
     >
-      <span>⚠️</span>
       <span>Draft, needs review by the owner before launch</span>
     </div>
   )
@@ -133,6 +132,12 @@ export function PrivacyContent() {
         <p style={{ marginBottom: 'var(--space-3)' }}>
           Product metrics and learner model health calculations are derived exclusively from Eleanor's own database.
         </p>
+      </section>
+
+      <section style={{ marginBottom: 'var(--space-6)' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: 'var(--space-2)' }}>Cookies, local storage and profile photos</h2>
+        <p>Sign-in uses browser local storage. A first-party cookie remembers your cookie choice for 180 days. If you allow preferences, a second cookie remembers sound and celebration choices for signed-out practice for 180 days. Cookie settings in the footer lets you withdraw that choice and removes the optional cookie.</p>
+        <p>Account preferences are saved with your profile. Profile photos are cropped and re-encoded as small JPEGs without source metadata. Your display name and photo follow your public-profile visibility setting and are included in export and account deletion.</p>
       </section>
 
       <section style={{ marginBottom: 'var(--space-6)' }}>

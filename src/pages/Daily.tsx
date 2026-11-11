@@ -8,6 +8,7 @@ import { PromptBlocks } from '../components/PromptBlocks.tsx'
 import { AnswerInput } from '../components/AnswerInput.tsx'
 import { ConfidenceInput } from '../components/ConfidenceInput.tsx'
 import { ResultPanel } from '../components/ResultPanel.tsx'
+import { useAnswerFeedback } from '../components/Experience.tsx'
 import { RepairLadder, type RepairStepData } from '../components/RepairLadder.tsx'
 import { Reveal } from '../components/Reveal.tsx'
 import { InsightInput } from '../components/InsightInput.tsx'
@@ -29,6 +30,7 @@ interface DailyStats {
 }
 
 export function Daily() {
+  const feedback = useAnswerFeedback()
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [initError, setInitError] = useState<string | null>(null)
@@ -139,6 +141,8 @@ export function Daily() {
     const parsed = parseAnswer(attempt.answerSpec, draftAnswer)
     if (!parsed.ok) return
 
+    feedback.prepare()
+
     try {
       const res = await commitAction.run({
         answer: draftAnswer,
@@ -146,6 +150,7 @@ export function Daily() {
         declaredHelp,
       })
 
+      feedback.celebrate(attempt.id, res.outcome === 'correct')
       // Update attempt to resolved state
       setAttempt((prev) => {
         if (!prev) return null
