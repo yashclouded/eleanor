@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test'
 import { test, adminClient, auditPage, createLearner } from './release-helpers.ts'
 
-test('name, photo and effects persist; uploads validate; failed saves retain edits', async ({ page }) => {
+test('name, photo and effects persist; uploads validate; failed saves retain edits', async ({ page }, testInfo) => {
   const learner = await createLearner(page, { onboarded: true })
   try {
     await page.goto('/settings')
@@ -57,7 +57,7 @@ test('name, photo and effects persist; uploads validate; failed saves retain edi
 
     await page.setViewportSize({ width: 320, height: 900 })
     await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' })
-    await page.screenshot({ path: '/private/tmp/eleanor-profile-settings.png', fullPage: true })
+    await page.screenshot({ path: testInfo.outputPath('profile-settings.png'), fullPage: true })
     await auditPage(page, 'Profile settings at 320px')
     await page.getByRole('button', { name: 'Remove photo', exact: true }).click()
     await page.getByRole('button', { name: 'Save profile', exact: true }).click()
