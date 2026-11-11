@@ -1,12 +1,12 @@
 import { sql } from '../db.ts'
 import { ok, body, HttpError, isUuid } from '../http.ts'
 import { withTransition } from '../transition.ts'
+import { rateLimit } from '../rate-limit.ts'
 import { parseAnswer, isCorrect, matchMisconception, parseNumber } from '../../_shared/grading.ts'
 import type { AnswerSpec, RawAnswer, Block, Tolerance } from '../../_shared/content/types.ts'
 import { toAttemptView, parseJsonIfNeeded } from './sets.ts'
 import { CODE_PROBLEMS } from '../../_shared/registry.ts'
 import { resolveAttempt } from '../resolve.ts'
-import { consumeRate } from '../rate-limit.ts'
 import type { Ctx } from '../router.ts'
 
 interface CommitBody {
@@ -19,7 +19,7 @@ interface CommitBody {
 function isCommitBody(x: unknown): x is CommitBody {
   if (!x || typeof x !== 'object') return false
   const b = x as Record<string, unknown>
-  return isUuid(b.transitionId) && 'answer' in b
+  return isUuid(b.transitionId) && 'answer' in b && (b.declaredHelp === undefined || typeof b.declaredHelp === 'boolean')
 }
 
 export async function handleCommitAttempt(ctx: Ctx): Promise<Response> {
@@ -101,7 +101,7 @@ export async function handleCommitAttempt(ctx: Ctx): Promise<Response> {
         attemptId,
       },
       async () => {
-        await consumeRate(tx, ctx.userId, 'commit')
+        await rateLimit(tx, ctx.userId, 'commit', 300, '1 hour')
         const secretAnswer =
           typeof attempt.secret_answer === 'string'
             ? JSON.parse(attempt.secret_answer)
@@ -197,7 +197,7 @@ export async function handleGiveUpAttempt(ctx: Ctx): Promise<Response> {
         attemptId,
       },
       async () => {
-        await consumeRate(tx, ctx.userId, 'commit')
+        await rateLimit(tx, ctx.userId, 'commit', 300, '1 hour')
         return await resolveAttempt(tx, {
           attemptId,
           userId: ctx.userId,

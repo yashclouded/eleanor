@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Block } from '../../supabase/functions/_shared/content/types.ts'
 import { PromptBlocks } from './PromptBlocks.tsx'
+import { Icon } from './Icon.tsx'
 
 export interface CodeVerdictProps {
   verdict:
@@ -132,32 +133,32 @@ export function CodeVerdict({
             >
               {isAccepted && (
                 <>
-                  <span aria-hidden="true">✓</span> Accepted
+                  <Icon name="check" size={24} /> Accepted
                 </>
               )}
               {isWrongAnswer && (
                 <>
-                  <span aria-hidden="true">✗</span> Wrong Answer
+                  <Icon name="cross" size={24} /> Wrong Answer
                 </>
               )}
               {isTimeLimit && (
                 <>
-                  <span aria-hidden="true">⏱</span> Time Limit Exceeded
+                  <Icon name="clock" size={24} /> Time Limit Exceeded
                 </>
               )}
               {isRuntimeError && (
                 <>
-                  <span aria-hidden="true">⚠</span> Runtime Error
+                  <Icon name="warning" size={24} /> Runtime Error
                 </>
               )}
               {isCompileError && (
                 <>
-                  <span aria-hidden="true">⚙</span> Compilation Error
+                  <Icon name="settings" size={24} /> Compilation Error
                 </>
               )}
               {isJudgeError && (
                 <>
-                  <span aria-hidden="true">!</span> Judge Error
+                  <Icon name="warning" size={24} /> Judge Error
                 </>
               )}
             </span>

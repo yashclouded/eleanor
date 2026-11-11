@@ -1,6 +1,6 @@
 import { withSupabase } from 'npm:@supabase/server@1.9.0'
 import { route } from './router.ts'
-import { fail, HttpError } from './http.ts'
+import { assertAllowedOrigin, fail, HttpError } from './http.ts'
 
 const appOrigin = Deno.env.get('APP_ORIGIN') ?? 'http://127.0.0.1:5173'
 
@@ -13,7 +13,8 @@ const corsHeaders: Record<string, string> = {
 function addCorsHeaders(res: Response): Response {
   const headers = new Headers(res.headers)
   headers.set('Access-Control-Allow-Origin', appOrigin)
-  headers.append('Vary', 'Origin')
+  headers.set('Vary', 'Origin')
+  headers.set('Cache-Control', 'no-store')
   return new Response(res.body, {
     status: res.status,
     statusText: res.statusText,
@@ -45,8 +46,9 @@ const handler = withSupabase(
 )
 
 Deno.serve(async (req) => {
-  const origin = req.headers.get('Origin')
-  if (origin && origin !== appOrigin) {
+  try {
+    assertAllowedOrigin(req, appOrigin)
+  } catch {
     return fail('forbidden', 'CORS origin not allowed')
   }
   // Handle CORS preflight for APP_ORIGIN only

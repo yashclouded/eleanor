@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
 test.beforeEach(async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.addInitScript(() => {
     Object.assign(window, { chimes: 0 })
     const parameter = { setValueAtTime() {}, exponentialRampToValueAtTime() {} }

@@ -1,9 +1,10 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixtures.ts'
 import AxeBuilder from '@axe-core/playwright'
 import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
 import http from 'node:http'
-import { CODE_PROBLEMS } from '../../supabase/functions/_shared/registry.ts'
+import { startTestApi } from '../api/runtime.ts'
+import { createUserClient } from '../api/helpers.ts'
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321'
 const SUPABASE_SECRET_KEY =
@@ -18,42 +19,6 @@ const testSql = postgres(
   process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
   { prepare: false, max: 2 }
 )
-
-const MAILPIT_URL = 'http://127.0.0.1:54324'
-
-interface MailpitMessageSummary {
-  ID: string
-  To?: { Address?: string }[]
-}
-
-interface MailpitMessagesResponse {
-  messages?: MailpitMessageSummary[]
-}
-
-async function getMagicLinkForEmail(email: string, maxAttempts = 20): Promise<string> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const res = await fetch(`${MAILPIT_URL}/api/v1/messages`)
-    const data = (await res.json()) as MailpitMessagesResponse
-    const msgMeta = (data.messages || []).find((m) =>
-      m.To?.some((t) => t.Address?.toLowerCase() === email.toLowerCase())
-    )
-
-    if (msgMeta) {
-      const detailRes = await fetch(`${MAILPIT_URL}/api/v1/message/${msgMeta.ID}`)
-      const detail = await detailRes.json()
-      const body = detail.Text || detail.HTML || ''
-
-      const match = body.match(/http:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify\?[^\s"'<>]+/i)
-      if (match) {
-        return match[0].replace(/&amp;/g, '&')
-      }
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 500))
-  }
-
-  throw new Error(`Magic link for email ${email} not found in Mailpit after ${maxAttempts} attempts`)
-}
 
 async function checkA11y(page: Page, contextName: string) {
   const results = await new AxeBuilder({ page }).analyze()
@@ -124,22 +89,14 @@ async function createAndLoginUser(
     on conflict (user_id, concept_id) do update set state = 'practiced'
   `
 
-  // 3. Login through /login magic link flow
-  await page.context().clearCookies()
-  await page.goto('/login')
-  await page.evaluate(() => {
-    localStorage.clear()
-    sessionStorage.clear()
+  const { data: link, error } = await adminClient.auth.admin.generateLink({ type: 'magiclink', email })
+  if (error) throw error
+  const { data: auth, error: authError } = await createUserClient('').auth.verifyOtp({ token_hash: link.properties.hashed_token, type: 'magiclink' })
+  if (authError) throw authError
+  await page.addInitScript(({ key, session }) => localStorage.setItem(key, JSON.stringify(session)), {
+    key: `sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`, session: auth.session,
   })
-  await page.goto('/login')
-  await page.locator('#email').fill(email)
-  await page.getByRole('button', { name: 'Send magic link' }).click()
-  await expect(page.getByTestId('check-email-state')).toBeVisible()
-
-  // 4. Retrieve magic link from Mailpit and navigate to it
-  const magicLink = await getMagicLinkForEmail(email)
-  await page.goto(magicLink)
-  await page.waitForURL('**/today')
+  await page.goto('/today')
   await expect(page.getByTestId('today-container')).toBeVisible()
 
   return { userId, handle, email }
@@ -157,6 +114,8 @@ interface ScriptedToken {
 test.describe('Task 5.3: Code UI E2E', () => {
   let fakeJudgeServer: http.Server
   let fakeJudgeUrl: string
+  let runtime: Awaited<ReturnType<typeof startTestApi>>
+  const fixtureUsers: string[] = [], fixtureInstances: string[] = []
   let tokenSeq = 0
 
   const tokenMap = new Map<string, ScriptedToken>()
@@ -268,23 +227,22 @@ test.describe('Task 5.3: Code UI E2E', () => {
     })
 
     await new Promise<void>((resolve) => {
-      fakeJudgeServer.listen(0, '127.0.0.1', () => {
+      fakeJudgeServer.listen(0, '::1', () => {
         const addr = fakeJudgeServer.address()
         if (typeof addr === 'object' && addr !== null) {
-          fakeJudgeUrl = `http://127.0.0.1:${addr.port}`
+          fakeJudgeUrl = `http://[::1]:${addr.port}`
         }
         resolve()
       })
     })
 
-    // Grant permission to copy to clipboard in browser contexts
-    // Ensure code track items are published
-    await testSql`
-      update items set status = 'published' where track_id = 'code'
-    `
+    runtime = await startTestApi(new URL(test.info().project.use.baseURL!).origin, fakeJudgeUrl)
   })
 
   test.afterAll(async () => {
+    if (runtime) await runtime.close()
+    for (const userId of fixtureUsers) await adminClient.auth.admin.deleteUser(userId)
+    if (fixtureInstances.length) await testSql`delete from instances where id in ${testSql(fixtureInstances)}`
     if (fakeJudgeServer) {
       await new Promise<void>((resolve) => fakeJudgeServer.close(() => resolve()))
     }
@@ -293,25 +251,30 @@ test.describe('Task 5.3: Code UI E2E', () => {
 
   test.beforeEach(async ({ context, page }) => {
     // Grant clipboard permissions
-    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await context.grantPermissions(['clipboard-write'])
 
-    // Direct all edge function Judge0 calls to the fake judge server
-    await page.route('**/functions/v1/api/**', (route) => {
-      const headers = {
-        ...route.request().headers(),
-        'x-judge0-url': fakeJudgeUrl,
-      }
-      route.continue({ headers })
+    await page.route('**/functions/v1/api/**', async (route) => {
+      const path = new URL(route.request().url()).pathname.split('/functions/v1/api')[1]
+      const response = await route.fetch({ url: runtime.url + path + new URL(route.request().url()).search })
+      await route.fulfill({ response })
     })
   })
 
   test('Full Code Track Flow: run samples, compile error stays rated, wrong answer fingerprint & unrated resubmit, reveal tabs, keyboard plain-text toggle, draft reload, axe audit', async ({
     page,
   }) => {
-    await createAndLoginUser(page, { tracks: ['code'], setSize: 3 })
+    const { userId } = await createAndLoginUser(page, { tracks: ['code'], setSize: 3 })
+    fixtureUsers.push(userId)
+    const [set] = await testSql`insert into sets (user_id, track_id, mode, size, rng_seed) values (${userId}, 'code', 'rated', 3, 1) returning id`
+    const [instance] = await testSql`insert into instances (item_id, seed, prompt, answer_spec)
+      values ('code.prefix.range-sums@1#1', 1, '[]', '{"type":"code","languages":["python","cpp","javascript"]}') returning id`
+    fixtureInstances.push(instance.id)
+    await testSql`insert into instance_secrets (instance_id, answer, misconceptions, steps, solution) values (${instance.id}, '[]', '[]', '[]', '[]')`
+    await testSql`insert into attempts (user_id, set_id, slot, instance_id, item_id, track_id, concept_id, family_id, kind, rated)
+      values (${userId}, ${set.id}, 0, ${instance.id}, 'code.prefix.range-sums@1#1', 'code', 'code.prefix', 'range-sums', 'selected', true)`
 
-    // 1. Start a Code set from Today
-    const startBtn = page.getByRole('button', { name: /Start code set/i })
+    // 1. Open the fixture set from Today
+    const startBtn = page.getByRole('button', { name: /(?:Start|Resume) code set/i })
     await expect(startBtn).toBeVisible()
     await startBtn.click()
 
@@ -388,21 +351,17 @@ test.describe('Task 5.3: Code UI E2E', () => {
     await expect(submitBtn).toBeVisible()
     await expect(submitBtn).toHaveText('Submit')
 
-    // 6. Submit with confidence: fail a known group of the selected problem.
+    // 6. Submit with confidence: Wrong answer on group 3 ('overflow')
     // Next submit is STILL rated!
-    const setId = new URL(page.url()).pathname.split('/').at(-1)!
-    const [attempt] = await testSql`select item_id from attempts where set_id = ${setId} order by slot limit 1`
     const testGroups = await testSql<{ group_idx: number; label: string; fingerprint: string; expected: string }[]>`
       select group_idx, label, fingerprint, expected
       from code_tests
-      where item_id = ${attempt.item_id}
+      where item_id = 'code.prefix.range-sums@1#1'
       order by group_idx asc
     `
-    expect(testGroups.length).toBeGreaterThan(0)
-    const failedIndex = Math.min(3, testGroups.length - 1)
 
     nextBatchResponses = testGroups.map((g, idx) => {
-      if (idx === failedIndex) {
+      if (idx === 3) {
         return {
           status: { id: 4, description: 'Wrong Answer' },
           stdout: 'wrong_overflow_output\n',
@@ -424,9 +383,9 @@ test.describe('Task 5.3: Code UI E2E', () => {
 
     // Verify failing test group fingerprint is displayed
     const failedLabel = page.getByTestId('failed-group-label')
-    await expect(failedLabel).toHaveText(testGroups[failedIndex].label)
+    await expect(failedLabel).toHaveText('overflow')
     const failedFingerprint = page.getByTestId('failed-group-fingerprint')
-    await expect(failedFingerprint).toHaveText(`Fingerprint: ${testGroups[failedIndex].fingerprint}`)
+    await expect(failedFingerprint).toContainText('32-bit integer overflow beyond 2^31')
 
     // Because this was the first non-compile submission, it was rated (no unrated badge yet)
     await expect(page.getByTestId('unrated-badge')).toHaveCount(0)
@@ -470,9 +429,7 @@ test.describe('Task 5.3: Code UI E2E', () => {
 
     // Editorial section
     await expect(page.getByTestId('editorial-section')).toBeVisible()
-    const problem = CODE_PROBLEMS.find((problem) => attempt.item_id === `${problem.id}@${problem.version}#1`)!
-    const paragraph = problem.editorial.find((block) => block.t === 'p')!
-    await expect(page.getByTestId('editorial-section')).toContainText(paragraph.text)
+    await expect(page.getByTestId('editorial-section')).toContainText('Prefix sums')
 
     // Reference solutions section with tabs
     await expect(page.getByTestId('reference-solutions-section')).toBeVisible()

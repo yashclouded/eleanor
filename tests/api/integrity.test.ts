@@ -1,96 +1,67 @@
+import { readFile } from 'node:fs/promises'
+import postgres from 'postgres'
 import { afterAll, describe, expect, it } from 'vitest'
-import type postgres from 'postgres'
-import { testSql } from './helpers.ts'
 
-async function rollbackTest(check: (tx: postgres.TransactionSql) => Promise<void>) {
-  const rollback = new Error('rollback integrity fixture')
-  try {
-    await testSql.begin(async (tx) => { await check(tx); throw rollback })
-  } catch (error) { if (error !== rollback) throw error }
-}
+const sql = postgres(process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres', { max: 1 })
+const migration = await readFile(new URL('../../supabase/migrations/0006_integrity.sql', import.meta.url), 'utf8')
 
-async function fixture(tx: postgres.TransactionSql) {
-  const userId = crypto.randomUUID()
-  const itemId = `integrity-${userId}`
-  await tx`insert into auth.users (id, email) values (${userId}, ${`integrity_${userId}@example.com`})`
-  await tx`
-    insert into public.profiles (id, handle, age_confirmed_at, terms_accepted_at, pledge_accepted_at, leaderboard_visible)
-    values (${userId}, ${`i_${userId.replaceAll('-', '').slice(0, 16)}`}, now(), now(), now(), true)
-  `
-  await tx`insert into public.concepts (id, track_id, name, summary, entry_rating, sort) values (${itemId}, 'judgment', 'Fixture', 'Integrity fixture', 1000, 999)`
-  await tx`insert into public.families (id, concept_id) values (${itemId}, ${itemId})`
-  await tx`
-    insert into public.items (id, kind, source_id, source_version, level, track_id, concept_id, family_id, rating, rd, status)
-    values (${itemId}, 'generated', ${itemId}, 1, 1, 'judgment', ${itemId}, ${itemId}, 1200, 250, 'published')
-  `
-  await tx`insert into public.track_ratings (user_id, track_id, rating, rd, n, peak) values (${userId}, 'judgment', 1200, 100, 30, 1200)`
-  return { userId, itemId }
-}
+describe('integrity flags (transactional fixtures; no lasting database changes)', () => {
+  afterAll(() => sql.end())
 
-async function attempt(tx: postgres.TransactionSql, userId: string, itemId: string, correct: boolean, forecast: number) {
-  const instanceId = crypto.randomUUID()
-  const attemptId = crypto.randomUUID()
-  await tx`insert into public.instances (id, item_id, seed, skin, prompt, answer_spec) values (${instanceId}, ${itemId}, 1, 'test', '[]', '{"type":"integer"}')`
-  await tx`
-    insert into public.attempts (id, user_id, instance_id, item_id, track_id, concept_id, family_id, kind, state, outcome, rated, confidence, forecast, resolved_at)
-    values (${attemptId}, ${userId}, ${instanceId}, ${itemId}, 'judgment', ${itemId}, ${itemId}, 'selected', 'resolved', ${correct ? 'correct' : 'incorrect'}, true, 0.8, ${forecast}, now())
-  `
-  return attemptId
-}
-
-describe('outcome-only integrity review flags', () => {
-  afterAll(async () => { await testSql.end() })
-
-  it('flags a +450 gain in five days once, without banning or unrating the learner', async () => rollbackTest(async (tx) => {
-    const { userId, itemId } = await fixture(tx)
-    const attemptId = await attempt(tx, userId, itemId, true, 0.5)
-    await tx`update public.track_ratings set rating = 1650, peak = 1650 where user_id = ${userId}`
-    await tx`
-      insert into public.rating_events (attempt_id, user_id, subject_type, subject_id, r_before, rd_before, r_after, rd_after, expected, score, model_version, created_at)
-      values (${attemptId}, ${userId}, 'track', 'judgment', 1200, 100, 1650, 100, 0.5, 1, 'erm-1', now() - interval '5 days')
-    `
-    await tx`select public.scan_integrity()`
-    await tx`select public.scan_integrity()`
-    const flags = await tx`select kind, detail from public.integrity_flags where user_id = ${userId}`
-    expect(flags).toHaveLength(1)
-    expect(flags[0].kind).toBe('rapid_gain')
-    expect(flags[0].detail.gain).toBe(450)
-    expect((await tx`select banned_at from public.profiles where id = ${userId}`)[0].banned_at).toBeNull()
-    expect((await tx`select rated from public.attempts where id = ${attemptId}`)[0].rated).toBe(true)
-    expect((await tx`select * from public.moderation_actions where user_id = ${userId}`)).toHaveLength(0)
-  }))
-
-  it('flags 30 wins against p=0.5 with z≈5.48 and deduplicates overlapping scans', async () => rollbackTest(async (tx) => {
-    const { userId, itemId } = await fixture(tx)
-    for (let i = 0; i < 30; i++) await attempt(tx, userId, itemId, true, 0.5)
-    await tx`select public.scan_integrity()`
-    await tx`select public.scan_integrity()`
-    const flags = await tx`select kind, detail from public.integrity_flags where user_id = ${userId}`
-    expect(flags).toHaveLength(1)
-    expect(flags[0].kind).toBe('improbable_run')
-    expect(flags[0].detail.z).toBeCloseTo(5.477225575, 8)
-    expect(flags[0].detail).toMatchObject({ n: 30, sumS: 30, sumE: 15, approximation: 'normal' })
-  }))
-
-  it('does not flag a normal 70% run or consider declared-help attempts', async () => rollbackTest(async (tx) => {
-    const { userId, itemId } = await fixture(tx)
-    for (let i = 0; i < 30; i++) await attempt(tx, userId, itemId, i < 21, 0.7)
-    await tx`select public.scan_integrity()`
-    expect(await tx`select id from public.integrity_flags where user_id = ${userId}`).toHaveLength(0)
-    await tx`update public.attempts set outcome = 'correct', declared_help = true where user_id = ${userId}`
-    await tx`select public.scan_integrity()`
-    expect(await tx`select id from public.integrity_flags where user_id = ${userId}`).toHaveLength(0)
-  }))
-
-  it('does not flag a rapid gain while RD is above 110', async () => rollbackTest(async (tx) => {
-    const { userId, itemId } = await fixture(tx)
-    const attemptId = await attempt(tx, userId, itemId, true, 0.5)
-    await tx`update public.track_ratings set rating = 1650, rd = 111 where user_id = ${userId}`
-    await tx`
-      insert into public.rating_events (attempt_id, user_id, subject_type, subject_id, r_before, rd_before, r_after, rd_after, expected, score, model_version)
-      values (${attemptId}, ${userId}, 'track', 'judgment', 1200, 111, 1650, 111, 0.5, 1, 'erm-1')
-    `
-    await tx`select public.scan_integrity()`
-    expect(await tx`select id from public.integrity_flags where user_id = ${userId}`).toHaveLength(0)
-  }))
+  it('flags +450 in 5 days and 30 improbable wins once, leaves a normal run alone, and never penalizes', async () => {
+    await sql.begin(async tx => {
+      const [installed] = await tx`select to_regprocedure('public.scan_integrity()') is not null as present`
+      if (!installed.present) await tx.unsafe(migration)
+      const ids = Array.from({ length: 4 }, () => crypto.randomUUID())
+      for (const id of ids) {
+        await tx`insert into auth.users (id) values (${id})`
+        await tx`insert into profiles (id, handle, age_confirmed_at, terms_accepted_at, pledge_accepted_at, leaderboard_visible)
+          values (${id}, ${'i_' + id.replaceAll('-', '').slice(0, 16)}, now(), now(), now(), true)`
+        await tx`insert into track_ratings (user_id, track_id, rating, rd, n, peak)
+          values (${id}, 'judgment', 1200, 100, 30, 1200)`
+      }
+      const [item] = await tx`select * from items where track_id = 'judgment' limit 1`
+      if (!item) throw new Error('Run local content:sync --include-drafts before API tests')
+      for (const [index, id] of ids.entries()) {
+        for (let i = 0; i < (index === 0 ? 1 : index === 3 ? 29 : 30); i++) {
+          const [instance] = await tx`insert into instances (item_id, seed, prompt, answer_spec)
+            values (${item.id}, ${i}, '[]', '{"type":"integer"}') returning id`
+          const [attempt] = await tx`insert into attempts
+            (user_id, instance_id, item_id, track_id, concept_id, family_id, kind, state, rated, outcome, confidence, forecast, resolved_at)
+            values (${id}, ${instance.id}, ${item.id}, 'judgment', ${item.concept_id}, ${item.family_id},
+              'selected', 'resolved', true, ${index === 2 && i >= 21 ? 'incorrect' : 'correct'}, 0.7,
+              ${index === 2 ? 0.7 : 0.5}, now() - interval '5 days' + ${i} * interval '1 minute') returning id`
+          if (index === 0) {
+            await tx`insert into rating_events (attempt_id, user_id, subject_type, subject_id,
+              r_before, rd_before, r_after, rd_after, expected, score, model_version, created_at)
+              values (${attempt.id}, ${id}, 'track', 'judgment', 1200, 100, 1650, 100, 0.5, 1, 'erm-1', now() - interval '5 days')`
+          }
+        }
+      }
+      await tx`update track_ratings set rating = 1650 where user_id = ${ids[0]}`
+      const before = await tx`select id, leaderboard_visible, banned_at from profiles where id in ${tx(ids)} order by id`
+      await tx`select public.scan_integrity()`
+      await tx`select public.scan_integrity()`
+      const flags = await tx`select user_id, kind, detail from integrity_flags where user_id in ${tx(ids)} order by user_id, kind`
+      expect(flags.filter(f => f.user_id === ids[0] && f.kind === 'rapid_gain')).toHaveLength(1)
+      const improbable = flags.filter(f => f.user_id === ids[1] && f.kind === 'improbable_run')
+      expect(improbable).toHaveLength(1)
+      expect(improbable[0].detail.z).toBeCloseTo(Math.sqrt(30), 9)
+      expect(improbable[0].detail).toMatchObject({ n: 30, sumS: 30, sumE: 15, variance: 7.5 })
+      expect(flags.filter(f => f.user_id === ids[2] || f.user_id === ids[3])).toHaveLength(0)
+      expect(await tx`select id, leaderboard_visible, banned_at from profiles where id in ${tx(ids)} order by id`).toEqual(before)
+      expect((await tx`select count(*)::int as n from attempts where user_id in ${tx(ids)} and rated`)[0].n).toBe(90)
+      expect((await tx`select count(*)::int as n from moderation_actions where user_id in ${tx(ids)}`)[0].n).toBe(0)
+      const [job] = await tx`select schedule, command from cron.job where jobname = 'scan-integrity-daily'`
+      expect(job).toMatchObject({ schedule: '0 4 * * *', command: 'select public.scan_integrity()' })
+      await tx`update integrity_flags set created_at = now() - interval '8 days' where user_id in ${tx(ids)}`
+      await tx`select public.scan_integrity()`
+      expect((await tx`select count(*)::int as n from integrity_flags where user_id = ${ids[0]} and kind = 'rapid_gain'`)[0].n).toBe(2)
+      expect((await tx`select count(*)::int as n from integrity_flags where user_id = ${ids[1]} and kind = 'improbable_run'`)[0].n).toBe(2)
+      await tx`set local role authenticated`
+      await expect(tx.savepoint(async sp => sp`select public.scan_integrity()`)).rejects.toThrow(/permission denied/)
+      await tx`reset role`
+      throw new Error('ROLLBACK_FIXTURE')
+    }).catch(error => { if (error.message !== 'ROLLBACK_FIXTURE') throw error })
+  })
 })

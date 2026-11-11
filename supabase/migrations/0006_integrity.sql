@@ -12,10 +12,8 @@ begin
   return new;
 end;
 $$;
-
 create trigger record_item_anchor before insert or update of anchor on public.items
 for each row execute function public.record_item_anchor();
-
 revoke all on function public.record_item_anchor() from public, anon, authenticated;
 
 -- Repair legacy declared-help flags: the live resolver already skipped their updates.
@@ -23,10 +21,8 @@ update public.attempts set rated = false
 where rated and (declared_help or kind in ('daily', 'unrated'));
 
 create index integrity_flags_recent on public.integrity_flags (user_id, track_id, kind, created_at desc);
-
 create index rating_events_track_time on public.rating_events (user_id, subject_id, created_at)
 where subject_type = 'track';
-
 create index rating_events_item_time on public.rating_events (subject_id, created_at)
 where subject_type = 'item';
 
@@ -80,7 +76,6 @@ begin
   );
 end;
 $$;
-
 revoke all on function public.scan_integrity() from public, anon, authenticated;
 
 select cron.schedule('scan-integrity-daily', '0 4 * * *', 'select public.scan_integrity()');

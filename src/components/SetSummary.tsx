@@ -1,4 +1,7 @@
 import { Link } from 'react-router-dom'
+import { title } from '../../supabase/functions/_shared/model.ts'
+import { Icon } from './Icon.tsx'
+import { TitleBadge } from './TitleBadge.tsx'
 
 export interface SetSummaryData {
   track: string
@@ -23,6 +26,8 @@ interface SetSummaryProps {
 export function SetSummary({ summary, onAnotherSet }: SetSummaryProps) {
   const delta = Math.round(summary.ratingAfter - summary.ratingBefore)
   const trackName = summary.track.charAt(0).toUpperCase() + summary.track.slice(1)
+  const reachedTitle = summary.ratingAfter > summary.ratingBefore && title(summary.ratingAfter) !== title(summary.ratingBefore)
+  const allCorrect = summary.attempts.length > 0 && summary.attempts.every((attempt) => attempt.outcome === 'correct')
 
   return (
     <div
@@ -37,6 +42,7 @@ export function SetSummary({ summary, onAnotherSet }: SetSummaryProps) {
       aria-label="Set summary"
     >
       <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
+        {summary.attempts.length > 0 && <div className="completion-trophy" aria-hidden="true"><Icon name="trophy" size={48} /></div>}
         <span
           style={{
             fontSize: '0.8125rem',
@@ -52,14 +58,22 @@ export function SetSummary({ summary, onAnotherSet }: SetSummaryProps) {
           Set Summary
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9375rem' }}>
-          Great effort! Here is your training breakdown for this set.
+          Review the methods that worked and the ideas to revisit.
         </p>
       </div>
+
+      {(reachedTitle || summary.echoesPassed > 0 || allCorrect) && <div className="achievement-row">
+        {reachedTitle && <span className="achievement-pill">Title reached <TitleBadge rating={summary.ratingAfter} /></span>}
+        {summary.echoesPassed > 0 && <span className="achievement-pill"><Icon name="echo" size={17} />{`${summary.echoesPassed} ${summary.echoesPassed === 1 ? 'echo' : 'echoes'} passed`}</span>}
+        {allCorrect && <span className="achievement-pill"><Icon name="medal" size={17} />Every problem solved</span>}
+      </div>}
 
       {/* Rating Change Card */}
       <div
         style={{
           display: 'flex',
+          flexWrap: 'wrap',
+          gap: 'var(--space-3)',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: 'var(--space-4) var(--space-5)',
@@ -130,7 +144,8 @@ export function SetSummary({ summary, onAnotherSet }: SetSummaryProps) {
                         color: isCorrect ? 'var(--success)' : 'var(--error)',
                       }}
                     >
-                      {isCorrect ? '✓ Correct' : att.outcome === 'gave_up' ? '⚐ Gave up' : '✗ Incorrect'}
+                      <Icon name={isCorrect ? 'check' : att.outcome === 'gave_up' ? 'flag' : 'cross'} size={15} />{' '}
+                      {isCorrect ? 'Correct' : att.outcome === 'gave_up' ? 'Gave up' : 'Incorrect'}
                     </span>
                   </td>
                   <td style={{ padding: 'var(--space-2) var(--space-3)', fontFamily: 'var(--font-mono)' }}>
@@ -185,17 +200,17 @@ export function SetSummary({ summary, onAnotherSet }: SetSummaryProps) {
           lineHeight: 1.5,
         }}
       >
-        💡 <strong>Spacing beats massing:</strong> taking breaks between training sets consolidates learning faster than continuous drilling.
+        <Icon name="echo" size={16} /> <strong>Spacing beats massing:</strong> taking breaks between training sets consolidates learning faster than continuous drilling.
       </div>
 
       {/* Actions */}
-      <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', justifyContent: 'center' }}>
         <Link to="/today" className="btn btn-secondary">
           Back to Today
         </Link>
         {onAnotherSet && (
           <button type="button" className="btn btn-primary" onClick={onAnotherSet}>
-            Another set
+            Another set <Icon name="arrow" size={17} />
           </button>
         )}
       </div>

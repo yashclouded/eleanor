@@ -1,11 +1,9 @@
 -- Admin diagnostics are server-only: the browser never receives raw attempts.
 alter table public.items add column anchored_at timestamptz;
-
 update public.items set anchored_at = updated_at where anchor;
 
 create index attempts_model_health on public.attempts (resolved_at)
   where rated and forecast is not null;
-
 create index rating_events_item_residual on public.rating_events (subject_id)
   where subject_type = 'item';
 
@@ -18,7 +16,6 @@ left join public.rating_events e on e.subject_type = 'item' and e.subject_id = i
 group by i.id;
 
 revoke all on public.admin_item_residuals from public, anon, authenticated;
-
 grant select on public.admin_item_residuals to service_role;
 
 create function public.admin_model_health(window_days int)
@@ -77,5 +74,4 @@ select jsonb_build_object(
 $$;
 
 revoke all on function public.admin_model_health(int) from public, anon, authenticated;
-
 grant execute on function public.admin_model_health(int) to service_role;

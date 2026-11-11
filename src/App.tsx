@@ -11,6 +11,7 @@ import {
 import { AuthProvider, useAuth } from './lib/auth.tsx'
 import { BrandMark, Icon } from './components/Icon.tsx'
 import { Avatar } from './components/Avatar.tsx'
+import { LoadPanel } from './components/LoadPanel.tsx'
 import { ExperienceProvider } from './components/Experience.tsx'
 import { Landing } from './pages/Landing.tsx'
 import { Login } from './pages/Login.tsx'
@@ -90,6 +91,11 @@ function TopBar() {
                   <Icon name="settings" /><span>Settings</span>
                 </NavLink>
               </li>
+              {session.user.app_metadata?.role === 'admin' && <li>
+                <NavLink to="/admin" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                  <Icon name="shield" /><span>Admin</span>
+                </NavLink>
+              </li>}
             </ul>
           </nav>
         )}
@@ -204,7 +210,7 @@ export function AppContent() {
             <Route path="/leaderboard/:track" element={<Leaderboard />} />
             <Route path="/u/:handle" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/admin" element={<React.Suspense fallback={<p role="status">Loading admin…</p>}><Admin /></React.Suspense>} />
+            <Route path="/admin" element={<LoadPanel label="admin console"><Admin /></LoadPanel>} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/legal" element={<Legal />} />

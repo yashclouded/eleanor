@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, useCallback } from 'react'
+import { lazy, useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth.tsx'
 import { api, type AttemptView } from '../lib/api.ts'
@@ -13,6 +13,7 @@ import { RepairLadder, type RepairStepData } from '../components/RepairLadder.ts
 import { Reveal } from '../components/Reveal.tsx'
 import { InsightInput } from '../components/InsightInput.tsx'
 import { SetSummary, type SetSummaryData } from '../components/SetSummary.tsx'
+import { LoadPanel } from '../components/LoadPanel.tsx'
 import type { RunResult } from '../components/CodeEditor.tsx'
 import { CodeVerdict } from '../components/CodeVerdict.tsx'
 import { useAnswerFeedback } from '../components/Experience.tsx'
@@ -501,7 +502,7 @@ export function SetPlayer() {
       {isCodeProblem ? (
         <>
           {/* Code Editor component handles problem statement, input/output formats, constraints, samples, and code editing */}
-          <Suspense fallback={<div className="form-card track-skeleton skeleton" role="status">Loading code workspace…</div>}>
+          <LoadPanel label="code editor">
             <CodeEditor
               attemptId={attempt.id}
               statementBlocks={
@@ -528,7 +529,7 @@ export function SetPlayer() {
               onRun={handleRunCode}
               disabled={isJudging}
             />
-          </Suspense>
+          </LoadPanel>
 
           {/* Compilation error verdict shown in presented state */}
           {isPresented && (codeCompileError || (codeVerdictInfo && codeVerdictInfo.verdict === 'compile_error')) && (

@@ -1,169 +1,151 @@
+import type postgres from 'npm:postgres@3.4.5'
 import { sql } from '../db.ts'
 import { body, HttpError, isUuid, ok } from '../http.ts'
+import { withTransition } from '../transition.ts'
 import type { Ctx } from '../router.ts'
 
-function requireAdmin(ctx: Ctx): void {
-  if (!ctx.isAdmin) throw new HttpError('forbidden', 'Administrator access required')
-}
-
-interface ReasonBody { reason: string }
-
-function hasReason(value: unknown): value is ReasonBody {
-  if (!value || typeof value !== 'object') return false
-  const reason = (value as Record<string, unknown>).reason
-  return typeof reason === 'string' && reason.trim().length >= 5 && reason.trim().length <= 1000
-}
-
-function validDate(value: unknown): value is string {
-  return typeof value === 'string' &&
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
-    Number.isFinite(Date.parse(value)) &&
-    new Date(`${value.slice(0, 10)}T00:00:00Z`).toISOString().slice(0, 10) === value.slice(0, 10)
-}
-
-interface UserActionBody extends ReasonBody {
-  action: 'ban' | 'unban' | 'unrate'
+interface ActionBody {
+  transitionId: string
+  reason: string
+  action?: 'ban' | 'unban' | 'unrate'
   from?: string
 }
 
-function isUserAction(value: unknown): value is UserActionBody {
-  if (!hasReason(value)) return false
-  const data = value as unknown as Record<string, unknown>
-  return typeof data.action === 'string' && ['ban', 'unban', 'unrate'].includes(data.action) &&
-    (data.from === undefined || (data.action === 'unrate' && validDate(data.from)))
+function isIsoDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return false
+  return Number.isFinite(Date.parse(value)) &&
+    new Date(`${value.slice(0, 10)}T00:00:00Z`).toISOString().slice(0, 10) === value.slice(0, 10)
+}
+
+function isActionBody(value: unknown): value is ActionBody {
+  if (!value || typeof value !== 'object') return false
+  const b = value as Record<string, unknown>
+  return isUuid(b.transitionId) && typeof b.reason === 'string' &&
+    b.reason.trim().length >= 5 && b.reason.trim().length <= 1000 &&
+    (b.from === undefined || isIsoDate(b.from))
+}
+
+type Change = {
+  userId: string
+  action: 'ban' | 'unban' | 'unrate' | 'note'
+  params: Record<string, string | number | boolean | null>
+}
+
+async function moderate(ctx: Ctx, b: ActionBody, kind: string, change: (tx: postgres.TransactionSql) => Promise<Change>): Promise<Response> {
+  return await sql.begin(async (tx) => {
+    const result = await withTransition(tx, { id: b.transitionId, userId: ctx.userId, kind }, async () => {
+      const changed = await change(tx)
+      const [note] = await tx`
+        insert into moderation_actions (admin_id, user_id, action, reason, params)
+        values (${ctx.userId}, ${changed.userId}, ${changed.action}, ${b.reason.trim()}, ${tx.json(changed.params)})
+        returning id
+      `
+      return { actionId: note.id }
+    })
+    return ok(result.response)
+  })
 }
 
 export async function handleModelHealth(ctx: Ctx): Promise<Response> {
-  requireAdmin(ctx)
-  const value = new URL(ctx.req.url).searchParams.get('days') ?? '30'
-  if (!/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 365) {
-    throw new HttpError('invalid', 'days must be an integer between 1 and 365')
+  const raw = new URL(ctx.req.url).searchParams.get('days') ?? '30'
+  const days = Number(raw)
+  if (!/^\d+$/.test(raw) || !Number.isInteger(days) || days < 1 || days > 365) {
+    throw new HttpError('invalid', 'Days must be an integer between 1 and 365')
   }
-  const [row] = await sql`select public.admin_model_health(${Number(value)}) as health`
+  const [row] = await sql`select public.admin_model_health(${days}) as health`
   return ok(row.health)
 }
 
 export async function handleAdminItems(ctx: Ctx): Promise<Response> {
-  requireAdmin(ctx)
-  const flagged = new URL(ctx.req.url).searchParams.get('flagged')
-  if (flagged !== null && flagged !== '0' && flagged !== '1') {
-    throw new HttpError('invalid', 'flagged must be 0 or 1')
-  }
+  const flagged = new URL(ctx.req.url).searchParams.get('flagged') === '1'
   const items = await sql`
-    select id, track_id as track, rating, rd, n, anchor, status, residual
+    select id, track_id as track, rating, rd, anchor, status, n, residual
     from public.admin_item_residuals
-    where ${flagged === '1'} = false or (n >= 50 and abs(residual) > 0.15)
+    where not ${flagged} or (n >= 50 and abs(residual) > 0.15 and status = 'published')
     order by abs(residual) desc nulls last, id
   `
   return ok({ items })
 }
 
-async function changeItem(ctx: Ctx, action: 'retire' | 'anchor'): Promise<Response> {
-  requireAdmin(ctx)
+export async function handleModerateItem(ctx: Ctx): Promise<Response> {
+  const b = await body(ctx.req, isActionBody)
   const id = ctx.params.id
-  if (!/^[a-z0-9_.-]+@\d+#\d+$/.test(id) || id.length > 200) {
-    throw new HttpError('invalid', 'Invalid item identifier')
-  }
-  const data = await body(ctx.req, hasReason)
-  return await sql.begin(async (tx) => {
-    const [item] = await tx`select id, status from public.items where id = ${id} for update`
+  const operation = /\/anchor\/?$/.test(new URL(ctx.req.url).pathname) ? 'anchor' : 'retire'
+  return await moderate(ctx, b, `admin:${operation}:${id}`, async (tx): Promise<Change> => {
+    const [item] = await tx`select id, status, anchor, n, rating, rd from items where id = ${id} for update`
     if (!item) throw new HttpError('not_found', 'Item not found')
-    if (action === 'anchor') {
-      if (item.status !== 'published') throw new HttpError('conflict', 'Only published items can be anchored')
-      const [responses] = await tx`select n from public.admin_item_residuals where id = ${id}`
-      if (responses.n < 200) throw new HttpError('conflict', 'Anchoring requires at least 200 calibrated item responses')
-      await tx`update public.items set anchor = true, updated_at = now() where id = ${id}`
-    } else {
-      await tx`update public.items set status = 'retired', updated_at = now() where id = ${id}`
+    if (operation === 'anchor') {
+      if (item.n < 200 || item.status !== 'published' || item.anchor) {
+        throw new HttpError('conflict', 'Anchoring requires an active, unfrozen item with at least 200 responses')
+      }
+      const [frozen] = await tx`
+        update items set anchor = true, anchored_at = now(), updated_at = now() where id = ${id}
+        returning anchored_at
+      `
+      return {
+        userId: ctx.userId, action: 'note',
+        params: { itemId: id, operation, anchoredAt: frozen.anchored_at.toISOString(), rating: item.rating, rd: item.rd },
+      }
     }
-    await tx`
-      insert into public.moderation_actions (admin_id, user_id, action, reason, params)
-      values (${ctx.userId}, ${ctx.userId}, 'note', ${data.reason.trim()},
-        ${tx.json({ itemId: id, itemAction: action })})
-    `
-    return ok({ id, action })
+    await tx`update items set status = 'retired', updated_at = now() where id = ${id}`
+    return { userId: ctx.userId, action: 'note', params: { itemId: id, operation, replayPending: true } }
   })
 }
 
-export function handleRetireItem(ctx: Ctx): Promise<Response> { return changeItem(ctx, 'retire') }
-export function handleAnchorItem(ctx: Ctx): Promise<Response> { return changeItem(ctx, 'anchor') }
-
-export async function handleAdminFlags(ctx: Ctx): Promise<Response> {
-  requireAdmin(ctx)
+export async function handleAdminFlags(_ctx: Ctx): Promise<Response> {
   const flags = await sql`
-    select f.id, f.user_id as "userId", p.handle, f.track_id as track,
-      f.kind, jsonb_strip_nulls(jsonb_build_object(
-        'gain', f.detail->'gain', 'days', f.detail->'days', 'rd', f.detail->'rd',
-        'n', f.detail->'n', 'sumS', f.detail->'sumS', 'sumE', f.detail->'sumE',
-        'variance', f.detail->'variance', 'z', f.detail->'z', 'approximation', f.detail->'approximation'
-      )) as detail, f.created_at as "createdAt", f.resolved_at as "resolvedAt", f.resolution
-    from public.integrity_flags f join public.profiles p on p.id = f.user_id
-    order by (f.resolved_at is null) desc, f.created_at desc, f.id
+    select f.id, f.user_id as "userId", p.handle, f.track_id as track, f.kind, f.created_at as "createdAt",
+      coalesce((select jsonb_object_agg(key, value) from jsonb_each(f.detail)
+        where key in ('gain', 'z', 'n', 'sumS', 'sumE', 'variance', 'rating', 'previousRating', 'rd')
+          and jsonb_typeof(value) = 'number'), '{}'::jsonb) as statistics
+    from integrity_flags f join profiles p on p.id = f.user_id
+    where f.resolved_at is null order by f.created_at, f.id
   `
   return ok({ flags })
 }
 
 export async function handleResolveFlag(ctx: Ctx): Promise<Response> {
-  requireAdmin(ctx)
-  if (!isUuid(ctx.params.id)) throw new HttpError('invalid', 'Invalid flag identifier')
-  const data = await body(ctx.req, hasReason)
-  return await sql.begin(async (tx) => {
-    const [flag] = await tx`select user_id, resolved_at from public.integrity_flags where id = ${ctx.params.id} for update`
-    if (!flag) throw new HttpError('not_found', 'Flag not found')
-    if (flag.resolved_at) throw new HttpError('conflict', 'Flag already resolved')
-    await tx`
-      update public.integrity_flags set resolved_at = now(), resolution = ${data.reason.trim()}
-      where id = ${ctx.params.id}
+  if (!isUuid(ctx.params.id)) throw new HttpError('invalid', 'Invalid flag id')
+  const b = await body(ctx.req, isActionBody)
+  return await moderate(ctx, b, `admin:resolve-flag:${ctx.params.id}`, async (tx) => {
+    const [flag] = await tx`
+      update integrity_flags set resolved_at = now(), resolution = ${b.reason.trim()}
+      where id = ${ctx.params.id} and resolved_at is null returning user_id
     `
-    await tx`
-      insert into public.moderation_actions (admin_id, user_id, action, reason, params)
-      values (${ctx.userId}, ${flag.user_id}, 'note', ${data.reason.trim()},
-        ${tx.json({ flagId: ctx.params.id })})
-    `
-    return ok({ id: ctx.params.id })
+    if (!flag) throw new HttpError('not_found', 'Unresolved flag not found')
+    return { userId: flag.user_id, action: 'note', params: { flagId: ctx.params.id, operation: 'resolve_flag' } }
   })
 }
 
-export async function handleAdminReports(ctx: Ctx): Promise<Response> {
-  requireAdmin(ctx)
+export async function handleAdminReports(_ctx: Ctx): Promise<Response> {
   const reports = await sql`
-    select r.id, r.target_id as "userId", target.handle,
-      reporter.handle as "reporterHandle", r.reason,
-      r.created_at as "createdAt", r.resolved_at as "resolvedAt", r.resolution
-    from public.reports r join public.profiles target on target.id = r.target_id
-    left join public.profiles reporter on reporter.id = r.reporter_id
-    order by (r.resolved_at is null) desc, r.created_at desc, r.id
+    select r.id, r.target_id as "userId", target.handle, reporter.handle as "reporterHandle", r.reason, r.created_at as "createdAt"
+    from reports r join profiles target on target.id = r.target_id
+    left join profiles reporter on reporter.id = r.reporter_id
+    where r.resolved_at is null order by r.created_at, r.id
   `
   return ok({ reports })
 }
 
-export async function handleUserAction(ctx: Ctx): Promise<Response> {
-  requireAdmin(ctx)
-  if (!isUuid(ctx.params.id)) throw new HttpError('invalid', 'Invalid user identifier')
-  const data = await body(ctx.req, isUserAction)
-  return await sql.begin(async (tx) => {
-    const [profile] = await tx`select id from public.profiles where id = ${ctx.params.id} for update`
-    if (!profile) throw new HttpError('not_found', 'User not found')
-    const from = data.from ? new Date(data.from).toISOString() : '1970-01-01T00:00:00.000Z'
-    let unrated = 0
-    if (data.action === 'unrate') {
+export async function handleModerateUser(ctx: Ctx): Promise<Response> {
+  if (!isUuid(ctx.params.id)) throw new HttpError('invalid', 'Invalid user id')
+  const b = await body(ctx.req, isActionBody)
+  if (b.action !== 'ban' && b.action !== 'unban' && b.action !== 'unrate') {
+    throw new HttpError('invalid', 'Action must be ban, unban, or unrate')
+  }
+  const action = b.action
+  return await moderate(ctx, b, `admin:${action}:${ctx.params.id}`, async (tx): Promise<Change> => {
+    const [user] = await tx`select id from profiles where id = ${ctx.params.id} for update`
+    if (!user) throw new HttpError('not_found', 'User not found')
+    if (action === 'unrate') {
       const changed = await tx`
-        update public.attempts set rated = false
-        where user_id = ${ctx.params.id} and rated and resolved_at >= ${from}::timestamptz
+        update attempts set rated = false where user_id = ${user.id} and rated
+          and resolved_at is not null and (${b.from ?? null}::timestamptz is null or resolved_at >= ${b.from ?? null}::timestamptz)
         returning id
       `
-      unrated = changed.length
-    } else {
-      await tx`
-        update public.profiles set banned_at = ${data.action === 'ban' ? new Date() : null}
-        where id = ${ctx.params.id}
-      `
+      return { userId: user.id, action, params: { from: b.from ?? null, affected: changed.length, replayPending: true } }
     }
-    const params = data.action === 'unrate' ? { from, unrated, replayRequired: true } : {}
-    await tx`
-      insert into public.moderation_actions (admin_id, user_id, action, reason, params)
-      values (${ctx.userId}, ${ctx.params.id}, ${data.action}, ${data.reason.trim()}, ${tx.json(params)})
-    `
-    return ok({ id: ctx.params.id, action: data.action, ...params })
+    await tx`update profiles set banned_at = ${action === 'ban' ? new Date() : null} where id = ${user.id}`
+    return { userId: user.id, action, params: {} }
   })
 }

@@ -27,7 +27,7 @@ export async function withTransition<T>(
       throw new HttpError('conflict', 'Transition not found')
     }
     const row = existing[0]
-    if (row.user_id !== t.userId || row.kind !== t.kind || row.attempt_id !== (t.attemptId ?? null)) {
+    if (row.user_id !== t.userId || row.kind !== t.kind || (t.attemptId !== undefined && row.attempt_id !== t.attemptId)) {
       throw new HttpError('conflict', 'Transition ID already exists for another user or action')
     }
     const response = typeof row.response === 'string' ? JSON.parse(row.response) : row.response

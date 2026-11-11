@@ -7,6 +7,6 @@ it('classifies malformed percent escapes before invoking a route handler', async
   const { route } = await import('../../supabase/functions/api/router.ts')
   const req = new Request('http://localhost/api/attempts/%E0%A4%A')
   await expect(route(req, { req, userId: crypto.randomUUID(), isAdmin: false })).rejects.toMatchObject({
-    name: 'HttpError', code: 'invalid', message: 'Malformed route parameter',
+    name: 'HttpError', code: 'invalid', message: 'Invalid path identifier',
   })
 })

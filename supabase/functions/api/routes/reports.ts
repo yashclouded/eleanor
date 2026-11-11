@@ -1,7 +1,7 @@
 import { sql } from '../db.ts'
 import { ok, body, HttpError } from '../http.ts'
+import { rateLimit } from '../rate-limit.ts'
 import type { Ctx } from '../router.ts'
-import { consumeRate } from '../rate-limit.ts'
 
 interface CreateReportBody {
   handle: string
@@ -30,7 +30,7 @@ export async function handleCreateReport(ctx: Ctx): Promise<Response> {
   }
 
   return await sql.begin(async (tx) => {
-    await consumeRate(tx, ctx.userId, 'report')
+    await rateLimit(tx, ctx.userId, 'report', 5, '24 hours')
 
     const [newReport] = await tx`
       insert into reports (reporter_id, target_id, reason, created_at)

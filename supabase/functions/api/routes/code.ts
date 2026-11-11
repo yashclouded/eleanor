@@ -11,7 +11,8 @@ import {
   type Judge0SubmissionResponse,
 } from '../judge0.ts'
 import { resolveAttempt } from '../resolve.ts'
-import { consumeRate } from '../rate-limit.ts'
+import { rateLimit } from '../rate-limit.ts'
+import { withTransition } from '../transition.ts'
 
 interface CodeRunBody {
   attemptId: string
@@ -27,7 +28,8 @@ function isCodeRunBody(x: unknown): x is CodeRunBody {
     isUuid(b.attemptId) &&
     typeof b.language === 'string' &&
     ['python', 'cpp', 'javascript'].includes(b.language) &&
-    typeof b.source === 'string'
+    typeof b.source === 'string' &&
+    (b.input === undefined || typeof b.input === 'string')
   )
 }
 
@@ -49,7 +51,8 @@ function isCodeSubmitBody(x: unknown): x is CodeSubmitBody {
     typeof b.language === 'string' &&
     ['python', 'cpp', 'javascript'].includes(b.language) &&
     typeof b.source === 'string' &&
-    typeof b.confidence === 'number'
+    typeof b.confidence === 'number' &&
+    (b.declaredHelp === undefined || typeof b.declaredHelp === 'boolean')
   )
 }
 
@@ -59,13 +62,7 @@ function isCodeSubmitBody(x: unknown): x is CodeSubmitBody {
  * Executes learner code on custom/sample input via Judge0.
  */
 export async function handleCodeRun(ctx: Ctx): Promise<Response> {
-  const b = await body(ctx.req, isCodeRunBody, 65536)
-
-  // Enforce source code limit (<= 64 KB = 65536 bytes)
-  const sourceBytes = new TextEncoder().encode(b.source).length
-  if (sourceBytes > 65536) {
-    throw new HttpError('invalid', 'Source code exceeds 64 KB limit')
-  }
+  const b = await body(ctx.req, isCodeRunBody)
 
   // Verify attempt exists and belongs to user
   const [attempt] = await sql`
@@ -77,17 +74,17 @@ export async function handleCodeRun(ctx: Ctx): Promise<Response> {
   if (!attempt) {
     throw new HttpError('not_found', 'Attempt not found')
   }
+
   const spec: AnswerSpec = typeof attempt.answer_spec === 'string' ? JSON.parse(attempt.answer_spec) : attempt.answer_spec
   if (spec.type !== 'code') throw new HttpError('invalid', 'Not a code attempt')
-  await sql.begin(async (tx) => consumeRate(tx, ctx.userId, 'code_run'))
+  await sql.begin((tx) => rateLimit(tx, ctx.userId, 'code_run', 20, '10 minutes'))
 
   const problem = CODE_PROBLEMS.find((p) => p.id === attempt.item_id.split('@')[0])
   const cpuSeconds = problem?.limits.cpuSeconds ?? 2.0
   const memoryKb = problem?.limits.memoryKb ?? 256000
   const langId = getLanguageId(b.language)
 
-  const customJudge0Url = ctx.req.headers.get('x-judge0-url') ?? undefined
-  const client = getJudge0Client(customJudge0Url)
+  const client = getJudge0Client()
 
   const res = await client.run(
     {
@@ -109,13 +106,7 @@ export async function handleCodeRun(ctx: Ctx): Promise<Response> {
  * Idempotent via transitionId.
  */
 export async function handleCodeSubmit(ctx: Ctx): Promise<Response> {
-  const b = await body(ctx.req, isCodeSubmitBody, 65536)
-
-  // Enforce source code limit (<= 64 KB)
-  const sourceBytes = new TextEncoder().encode(b.source).length
-  if (sourceBytes > 65536) {
-    throw new HttpError('invalid', 'Source code exceeds 64 KB limit')
-  }
+  const b = await body(ctx.req, isCodeSubmitBody)
 
   // Enforce confidence range [0, 1]
   if (!Number.isFinite(b.confidence) || b.confidence < 0 || b.confidence > 1) {
@@ -123,22 +114,7 @@ export async function handleCodeSubmit(ctx: Ctx): Promise<Response> {
   }
 
   return await sql.begin(async (tx) => {
-    // 1. Check idempotency transition
-    const [existing] = await tx`
-      select * from transitions where id = ${b.transitionId} for update
-    `
-    if (existing) {
-      if (existing.user_id !== ctx.userId || existing.kind !== 'code_submit' || existing.attempt_id !== b.attemptId) {
-        throw new HttpError('conflict', 'Transition ID already used by another user')
-      }
-      const response =
-        typeof existing.response === 'string'
-          ? JSON.parse(existing.response)
-          : existing.response
-      return ok(response)
-    }
-
-    // 2. Lock attempt row
+    // Lock before replay checks so concurrent retries see the completed transition.
     const [attempt] = await tx`
       select a.*, i.answer_spec
       from attempts a
@@ -149,111 +125,107 @@ export async function handleCodeSubmit(ctx: Ctx): Promise<Response> {
     if (!attempt) {
       throw new HttpError('not_found', 'Attempt not found')
     }
-    if (attempt.state !== 'presented' && attempt.state !== 'resolved') {
-      throw new HttpError('conflict', 'Attempt is not in presented state')
-    }
+    const result = await withTransition(tx, {
+      id: b.transitionId, userId: ctx.userId, kind: 'code_submit', attemptId: b.attemptId,
+    }, async () => {
+      if (attempt.state !== 'presented' && attempt.state !== 'resolved') {
+        throw new HttpError('conflict', 'Attempt is not in presented state')
+      }
 
-    const spec: AnswerSpec =
-      typeof attempt.answer_spec === 'string'
-        ? JSON.parse(attempt.answer_spec)
-        : attempt.answer_spec
-    if (spec.type !== 'code') {
-      throw new HttpError('invalid', 'Not a code attempt')
-    }
+      const spec: AnswerSpec =
+        typeof attempt.answer_spec === 'string'
+          ? JSON.parse(attempt.answer_spec)
+          : attempt.answer_spec
+      if (spec.type !== 'code') {
+        throw new HttpError('invalid', 'Not a code attempt')
+      }
 
-    // Determine if rated: true when attempt is rated, state was presented, no declared help,
-    // and no earlier evaluated submission exists (ignoring compile_error and judge_error).
-    const [earlierEvaluated] = await tx`
-      select count(*)::int as count
-      from code_submissions
-      where attempt_id = ${b.attemptId}
-        and verdict is not null
-        and verdict not in ('compile_error', 'judge_error')
-    `
-    const isRated = Boolean(
-      attempt.state === 'presented' &&
-      attempt.rated &&
-      !b.declaredHelp &&
-      earlierEvaluated.count === 0
-    )
-
-    // Fetch test groups for this problem item
-    const testGroups = await tx`
-      select group_idx, label, fingerprint, input, expected
-      from code_tests
-      where item_id = ${attempt.item_id}
-      order by group_idx asc
-    `
-    if (testGroups.length === 0) {
-      throw new HttpError('internal', `No code tests found for item ${attempt.item_id}`)
-    }
-
-    const problem = CODE_PROBLEMS.find((p) => p.id === attempt.item_id.split('@')[0])
-    const cpuSeconds = problem?.limits.cpuSeconds ?? 2.0
-    const memoryKb = problem?.limits.memoryKb ?? 256000
-    const langId = getLanguageId(b.language)
-
-    const customJudge0Url = ctx.req.headers.get('x-judge0-url') ?? undefined
-    const client = getJudge0Client(customJudge0Url)
-    await consumeRate(tx, ctx.userId, 'commit')
-
-    let batchResults: { token: string }[]
-    try {
-      batchResults = await client.createBatchSubmissions(
-        testGroups.map((g) => ({
-          language_id: langId,
-          source_code: b.source,
-          stdin: g.input,
-          cpu_time_limit: cpuSeconds,
-          memory_limit: memoryKb,
-        }))
-      )
-    } catch (err: unknown) {
-      // Judge0 failure on submit -> attempt stays presented, learner can resubmit
-      throw new HttpError(
-        'internal',
-        `Judge0 submission failed: ${err instanceof Error ? err.message : String(err)}`
-      )
-    }
-
-    const tokens = batchResults.map((r) => r.token)
-    const submissionId = crypto.randomUUID()
-
-    await tx`
-      insert into code_submissions (
-        id, attempt_id, user_id, language, source, confidence,
-        rated, status, judge_tokens, created_at
-      ) values (
-        ${submissionId}, ${b.attemptId}, ${ctx.userId}, ${b.language}, ${b.source}, ${b.confidence},
-        ${isRated}, 'queued', ${tokens}, now()
-      )
-    `
-
-    if (attempt.state === 'presented') {
-      await tx`
-        update attempts
-        set state = 'judging',
-            declared_help = ${attempt.declared_help || Boolean(b.declaredHelp)}
-        where id = ${b.attemptId}
+      // Determine if rated: true when attempt is rated, state was presented, no declared help,
+      // and no earlier evaluated submission exists (ignoring compile_error and judge_error).
+      const [earlierEvaluated] = await tx`
+        select count(*)::int as count
+        from code_submissions
+        where attempt_id = ${b.attemptId}
+          and verdict is not null
+          and verdict not in ('compile_error', 'judge_error')
       `
-    } else {
-      await tx`
-        update attempts
-        set declared_help = ${attempt.declared_help || Boolean(b.declaredHelp)}
-        where id = ${b.attemptId}
-      `
-    }
-
-    const responseData = { submissionId }
-    await tx`
-      insert into transitions (id, user_id, kind, attempt_id, response, created_at)
-      values (
-        ${b.transitionId}, ${ctx.userId}, 'code_submit', ${b.attemptId},
-        ${JSON.stringify(responseData)}::jsonb, now()
+      const isRated = Boolean(
+        attempt.state === 'presented' &&
+        attempt.rated &&
+        !b.declaredHelp &&
+        earlierEvaluated.count === 0
       )
-    `
 
-    return ok(responseData)
+      // Fetch test groups for this problem item
+      const testGroups = await tx`
+        select group_idx, label, fingerprint, input, expected
+        from code_tests
+        where item_id = ${attempt.item_id}
+        order by group_idx asc
+      `
+      if (testGroups.length === 0) {
+        throw new HttpError('internal', `No code tests found for item ${attempt.item_id}`)
+      }
+
+      await rateLimit(tx, ctx.userId, 'commit', 300, '1 hour')
+
+      const problem = CODE_PROBLEMS.find((p) => p.id === attempt.item_id.split('@')[0])
+      const cpuSeconds = problem?.limits.cpuSeconds ?? 2.0
+      const memoryKb = problem?.limits.memoryKb ?? 256000
+      const langId = getLanguageId(b.language)
+
+      const client = getJudge0Client()
+
+      let batchResults: { token: string }[]
+      try {
+        batchResults = await client.createBatchSubmissions(
+          testGroups.map((g) => ({
+            language_id: langId,
+            source_code: b.source,
+            stdin: g.input,
+            cpu_time_limit: cpuSeconds,
+            memory_limit: memoryKb,
+          }))
+        )
+      } catch {
+        // Judge0 failure on submit -> attempt stays presented, learner can resubmit
+        throw new HttpError(
+          'internal',
+          'Code judging is unavailable. Please retry.'
+        )
+      }
+
+      const tokens = batchResults.map((r) => r.token)
+      const submissionId = crypto.randomUUID()
+
+      await tx`
+        insert into code_submissions (
+          id, attempt_id, user_id, language, source, confidence,
+          rated, status, judge_tokens, created_at
+        ) values (
+          ${submissionId}, ${b.attemptId}, ${ctx.userId}, ${b.language}, ${b.source}, ${b.confidence},
+          ${isRated}, 'queued', ${tokens}, now()
+        )
+      `
+
+      if (attempt.state === 'presented') {
+        await tx`
+          update attempts
+          set state = 'judging',
+              declared_help = ${attempt.declared_help || Boolean(b.declaredHelp)}
+          where id = ${b.attemptId}
+        `
+      } else {
+        await tx`
+          update attempts
+          set declared_help = ${attempt.declared_help || Boolean(b.declaredHelp)}
+          where id = ${b.attemptId}
+        `
+      }
+
+      return { submissionId }
+    })
+    return ok(result.response)
   })
 }
 
@@ -293,8 +265,7 @@ export async function handleGetCodeSubmission(ctx: Ctx): Promise<Response> {
   }
 
   // Status is 'queued': poll Judge0 batch results
-  const customJudge0Url = ctx.req.headers.get('x-judge0-url') ?? undefined
-  const client = getJudge0Client(customJudge0Url)
+  const client = getJudge0Client()
 
   let batchResults: Judge0SubmissionResponse[]
   try {

@@ -2494,3 +2494,8 @@ textarea {
   transition-duration: .01ms !important;
   scroll-behavior: auto !important;
 }
+
+.completion-trophy { display: grid; place-items: center; width: 100px; height: 100px; color: var(--accent); background: var(--accent-soft); border: 1px solid var(--border); border-radius: 50%; margin: 12px auto 26px; position: relative; }
+.completion-trophy::before { content: ''; position: absolute; inset: -9px; border: 1px dashed var(--control-border); border-radius: 50%; opacity: 0.55; }
+.achievement-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 20px 0 28px; }
+.achievement-pill { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; font-size: 0.8125rem; color: var(--accent); background: var(--accent-soft); }

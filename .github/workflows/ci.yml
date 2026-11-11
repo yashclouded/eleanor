@@ -1,4 +1,4 @@
-name: MVP release checks
+name: CI
 
 on:
   pull_request:
@@ -9,23 +9,23 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.11.0
+          node-version-file: .nvmrc
           cache: npm
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.9.7
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: 2.119.0
       - run: npm ci
@@ -33,62 +33,69 @@ jobs:
       - run: npm test
       - run: npm run content:check
       - uses: actions/cache@v4
-        id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium
-      - run: supabase start -x studio,imgproxy,logflare,vector,supavisor
-      - run: npm run db:reset
-      - name: Configure the isolated test stack
-        shell: bash
+      - name: Start isolated local services
         run: |
-          node --input-type=module <<'JS'
+          # Mailpit receives all fixture email; this does not configure hosted Auth.
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const path = 'supabase/config.toml'
+          fs.writeFileSync(path, fs.readFileSync(path, 'utf8').replace('email_sent = 2', 'email_sent = 1000'))
+          NODE
+          supabase start -x studio,imgproxy,postgres-meta,realtime,storage-api,logflare,vector,supavisor
+          npm run db:reset
+      - run: npm run test:db
+      - name: Configure local test credentials
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
           import { execFileSync } from 'node:child_process'
-          import { appendFileSync, writeFileSync } from 'node:fs'
-          const local = JSON.parse(execFileSync('supabase', ['status', '-o', 'json'], { encoding: 'utf8' }))
-          const values = {
-            VITE_SUPABASE_URL: local.API_URL,
-            VITE_SUPABASE_PUBLISHABLE_KEY: local.PUBLISHABLE_KEY ?? local.ANON_KEY,
-            SUPABASE_SECRET_KEY: local.SECRET_KEY ?? local.SERVICE_ROLE_KEY,
-            SUPABASE_SERVICE_ROLE_KEY: local.SERVICE_ROLE_KEY,
-            DATABASE_URL: local.DB_URL,
+          const status = JSON.parse(execFileSync('supabase', ['status', '-o', 'json'], { encoding: 'utf8' }))
+          const env = {
+            VITE_SUPABASE_URL: status.API_URL,
+            VITE_SUPABASE_PUBLISHABLE_KEY: status.PUBLISHABLE_KEY || status.ANON_KEY,
+            SUPABASE_SECRET_KEY: status.SECRET_KEY || status.SERVICE_ROLE_KEY,
+            SUPABASE_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY,
+            DATABASE_URL: status.DB_URL,
+            MAILPIT_URL: status.MAILPIT_URL || status.INBUCKET_URL,
+            PLAYWRIGHT_BASE_URL: 'http://localhost:5173',
           }
-          for (const [key, value] of Object.entries(values)) {
-            if (!value) throw new Error(`Missing local test configuration: ${key}`)
-            console.log(`::add-mask::${value}`)
-            appendFileSync(process.env.GITHUB_ENV, `${key}=${value}\n`)
-          }
-          writeFileSync('.env.local', `VITE_SUPABASE_URL=${values.VITE_SUPABASE_URL}\nVITE_SUPABASE_PUBLISHABLE_KEY=${values.VITE_SUPABASE_PUBLISHABLE_KEY}\n`)
-          writeFileSync('/tmp/eleanor-functions.env', [
-            'APP_ORIGIN=http://127.0.0.1:5173',
-            'ELEANOR_TEST_CLOCK=1',
-            'ENABLE_TEST_JUDGE0=1',
-            'JUDGE0_LANGUAGES={"python":71,"cpp":54,"javascript":63}',
-          ].join('\n') + '\n')
-          JS
-          supabase functions serve --env-file /tmp/eleanor-functions.env > /tmp/eleanor-functions.log 2>&1 &
-          for i in {1..60}; do
-            status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:54321/functions/v1/api/me)
-            if [ "$status" = 401 ]; then break; fi
+          for (const [key, value] of Object.entries(env)) if (!value) throw new Error(`Missing local ${key}`)
+          const lines = Object.entries(env).map(([key, value]) => `${key}=${value}`).join('\n') + '\n'
+          fs.writeFileSync('.env.local', lines)
+          fs.appendFileSync(process.env.GITHUB_ENV, lines)
+          fs.writeFileSync('supabase/.env.local', 'APP_ORIGIN=http://localhost:5173\nELEANOR_TEST_CLOCK=1\nJUDGE0_URL=http://127.0.0.1:2358\n')
+          NODE
+      - run: npm run content:code:build
+      - run: npm run content:sync -- --include-drafts
+      - name: Serve API and await readiness
+        run: |
+          npm run functions:serve > /tmp/eleanor-functions.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            status=$(curl --silent --output /dev/null --write-out '%{http_code}' "$VITE_SUPABASE_URL/functions/v1/api/me")
+            if [ "$status" = 401 ]; then exit 0; fi
             sleep 1
           done
-          test "$status" = 401
-      - run: npm run test:db
-      - name: Build isolated local content fixtures
-        run: |
-          npm run content:code:build
-          npm run content:sync -- --include-drafts
+          cat /tmp/eleanor-functions.log
+          exit 1
       - run: npm run test:api
+      - run: npm run test:replay
+      - run: npm run content:sync -- --include-drafts
       - run: npm run test:e2e
       - run: npm run build
-      - uses: actions/upload-artifact@v4
+      - name: Upload browser diagnostics
         if: failure()
+        uses: actions/upload-artifact@v4
         with:
-          name: release-failure-evidence
-          path: |
-            test-results/
-            playwright-report/
-            /tmp/eleanor-functions.log
-      - run: supabase stop --no-backup
+          name: test-results
+          path: test-results/
+          retention-days: 7
+      - name: Function logs on failure
+        if: failure()
+        run: cat /tmp/eleanor-functions.log || true
+      - name: Stop local services
         if: always()
+        run: npm run db:stop

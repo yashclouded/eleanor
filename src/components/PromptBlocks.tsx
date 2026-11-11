@@ -52,6 +52,7 @@ export function PromptBlocks({ blocks, className = '' }: PromptBlocksProps) {
             return (
               <pre
                 key={idx}
+                tabIndex={0}
                 className="prompt-code"
                 style={{
                   background: 'var(--surface-hover)',
@@ -89,7 +90,7 @@ export function PromptBlocks({ blocks, className = '' }: PromptBlocksProps) {
 
           case 'table':
             return (
-              <div key={idx} style={{ overflowX: 'auto', marginBottom: 'var(--space-4)' }}>
+              <div key={idx} tabIndex={0} style={{ overflowX: 'auto', marginBottom: 'var(--space-4)' }}>
                 <table
                   className="prompt-table"
                   style={{

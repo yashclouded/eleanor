@@ -1,175 +1,278 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createClient } from '@supabase/supabase-js'
-import { adminClient, call, createTestUser, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, testSql } from './helpers.ts'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import type postgres from 'postgres'
+import { readFile } from 'node:fs/promises'
+import { testSql } from './helpers.ts'
 
-describe('Task 7.1: Admin model health and moderation', () => {
-  let admin: Awaited<ReturnType<typeof createTestUser>>
-  let learner: Awaited<ReturnType<typeof createTestUser>>
-  let target: Awaited<ReturnType<typeof createTestUser>>
-  const prefix = `ad71_${crypto.randomUUID().slice(0, 8)}`
-  const counts = [60, 40, 200, 200]
-  const items = counts.map((n, index) => `${prefix}_${n}_${index}@1#1`)
+const database = vi.hoisted(() => ({ sql: undefined as unknown }))
+vi.mock('../../supabase/functions/api/db.ts', () => ({
+  get sql() { return database.sql },
+}))
 
-  beforeAll(async () => {
-    admin = await createTestUser('admin71')
-    learner = await createTestUser('learner71')
-    target = await createTestUser('target71')
-    for (const [index, account] of [admin, learner, target].entries()) {
-      expect((await call('/onboarding', {
-        handle: `${prefix}_${index}`, ageConfirmed: true, termsAccepted: true,
-        pledgeAccepted: true, leaderboardVisible: true, tracks: ['judgment'],
-      }, account.token)).status).toBe(201)
-    }
-    await adminClient.auth.admin.updateUserById(admin.user.id, { app_metadata: { role: 'admin' } })
-    const { data } = await adminClient.auth.admin.generateLink({ type: 'magiclink', email: admin.user.email! })
-    const fresh = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
-    const { data: signedIn, error } = await fresh.auth.verifyOtp({ token_hash: data.properties!.hashed_token, type: 'magiclink' })
-    if (error || !signedIn.session) throw new Error(error?.message ?? 'No admin session')
-    admin.token = signedIn.session.access_token
-    for (const [index, n] of counts.entries()) {
-      await testSql`
-        insert into items (id, kind, source_id, source_version, level, track_id, concept_id,
-          family_id, rating, rd, n, anchor, status, daily_eligible)
-        select ${items[index]}, kind, source_id, source_version, level, track_id, concept_id,
-          family_id, rating, rd, ${n}, false, status, false from items
-        where id = 'judgment.base-rate.screening@1#1'
+type Route = (req: Request, ctx: { userId: string; isAdmin: boolean; req: Request }) => Promise<Response>
+let route: Route
+let migration: string
+let adminId: string
+let learnerId: string
+let itemId: string
+
+beforeAll(async () => {
+  // A dynamic path keeps Deno-only server modules out of the browser's TS project.
+  const routerPath = '../../supabase/functions/api/router.ts'
+  route = (await import(routerPath)).route
+  migration = await readFile('supabase/migrations/0005_model_health.sql', 'utf8').catch(() => '')
+})
+
+afterAll(async () => { await testSql.end() })
+
+async function fixture(run: (tx: postgres.TransactionSql) => Promise<void>) {
+  const rollback = new Error('Roll back admin fixtures')
+  try {
+    await testSql.begin(async (tx) => {
+      // Admin writes use savepoints so the complete fixture can be rolled back.
+      database.sql = new Proxy(tx, {
+        get(target, key) { return key === 'begin' ? target.savepoint.bind(target) : Reflect.get(target, key) },
+      })
+      const [installed] = await tx`select to_regprocedure('public.admin_model_health(integer)') as function`
+      if (!installed.function && migration) await tx.unsafe(migration)
+      adminId = crypto.randomUUID()
+      learnerId = crypto.randomUUID()
+      itemId = `judgment.admin-test-${crypto.randomUUID()}@1#1`
+      for (const id of [adminId, learnerId]) {
+        await tx`insert into auth.users (id) values (${id})`
+        await tx`
+          insert into profiles (id, handle, age_confirmed_at, terms_accepted_at, pledge_accepted_at, leaderboard_visible)
+          values (${id}, ${`adm_${id.slice(0, 8)}`}, now(), now(), now(), true)
+        `
+      }
+      await tx`
+        insert into items (id, kind, source_id, source_version, level, track_id, concept_id, family_id, rating, rd, status)
+        select ${itemId}, kind, source_id, source_version, level, track_id, concept_id, family_id, 1200, 250, 'published'
+        from items order by id limit 1
       `
-      await seed(items[index], n, 0.7)
-    }
-    await testSql`delete from rating_events where subject_type = 'item' and subject_id = ${items[3]}`
-    await testSql`update items set n = 0 where id = ${items[3]}`
-  })
-
-  afterAll(async () => {
-    if (admin) await testSql`delete from moderation_actions where admin_id = ${admin.user.id}`
-    for (const account of [target, learner, admin]) if (account) await adminClient.auth.admin.deleteUser(account.user.id)
-    await testSql`delete from instances where item_id in ${testSql(items)}`
-    await testSql`delete from items where id in ${testSql(items)}`
-    await testSql`refresh materialized view private.leaderboard`
-    await testSql.end()
-  })
-
-  async function seed(item: string, count: number, forecast: number, outcome = 'correct') {
-    await testSql`
-      with instances_inserted as (
-        insert into instances (item_id, seed, skin, prompt, answer_spec)
-        select ${item}, g, 'factory', '[]'::jsonb,
-          '{"type":"number","tolerance":{"abs":0.1}}'::jsonb from generate_series(1, ${count}) g
-        returning id
-      ), attempts_inserted as (
-        insert into attempts (user_id, instance_id, item_id, track_id, concept_id, family_id,
-          kind, state, outcome, rated, confidence, forecast, answer, resolved_at)
-        select ${target.user.id}, id, ${item}, 'judgment', 'judgment.base-rates', 'base-rate-screening',
-          'selected', 'resolved', ${outcome}, true, 0.9, ${forecast}, '"PRIVATE_ANSWER"'::jsonb, now()
-        from instances_inserted returning id
-      )
-      insert into rating_events (attempt_id, user_id, subject_type, subject_id, r_before, rd_before,
-        r_after, rd_after, expected, score, model_version)
-      select id, ${target.user.id}, 'item', ${item}, 1200, 100, 1201, 99, ${forecast}, ${outcome === 'correct' ? 1 : 0}, 'erm-1'
-      from attempts_inserted
-    `
+      await run(tx)
+      throw rollback
+    })
+  } catch (error) {
+    if (error !== rollback) throw error
   }
+}
 
-  it('denies non-admins on every admin route, including mutations', async () => {
-    const cases: [string, unknown?][] = [
-      ['/admin/model-health'], ['/admin/items?flagged=1'], ['/admin/flags'], ['/admin/reports'],
-      [`/admin/items/${encodeURIComponent(items[0])}/retire`, { reason: 'Review item' }],
-      [`/admin/items/${encodeURIComponent(items[0])}/anchor`, { reason: 'Review anchor' }],
-      [`/admin/flags/${crypto.randomUUID()}/resolve`, { reason: 'Reviewed flag' }],
-      [`/admin/users/${target.user.id}/action`, { action: 'ban', reason: 'Confirmed issue' }],
-    ]
-    for (const [path, body] of cases) expect((await call(path, body, learner.token)).status).toBe(403)
+async function request(path: string, payload?: Record<string, unknown>, isAdmin = true) {
+  const req = new Request(`http://localhost/api/admin${path}`, {
+    method: payload ? 'POST' : 'GET',
+    ...(payload ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) } : {}),
   })
+  try {
+    return await route(req, { userId: adminId, isAdmin, req })
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && typeof error.code === 'string') {
+      const statuses: Record<string, number> = { invalid: 400, not_found: 404, conflict: 409 }
+      const status = statuses[error.code]
+      if (status) return new Response(JSON.stringify({ error: error.message }), { status })
+    }
+    throw error
+  }
+}
 
-  it('scores stored forecasts, returns track counts and drift, and validates the window', async () => {
-    const baseline = await call('/admin/model-health?days=30', undefined, admin.token)
-    expect(baseline.status).toBe(200)
-    await seed(items[1], 1, 0.8)
-    await seed(items[1], 1, 0.6, 'incorrect')
-    const response = await call('/admin/model-health?days=30', undefined, admin.token)
-    expect(response.status).toBe(200)
-    // The two new responses contribute (.8-1)^2 + (.6-0)^2 = .04 + .36 = .4.
-    const before = baseline.data.data
-    const brier = (before.brier * before.n + 0.4) / (before.n + 2)
-    expect(response.data.data.n).toBe(before.n + 2)
-    expect(response.data.data.brier).toBeCloseTo(brier, 12)
-    expect(response.data.data.bins).toHaveLength(5)
-    expect(response.data.data.perTrack).toHaveLength(4)
-    expect(response.data.data.learnerDrift).toBeInstanceOf(Array)
-    expect(response.data.data.anchorDrift).toBeInstanceOf(Array)
-    expect(JSON.stringify(response.data)).not.toContain('PRIVATE_ANSWER')
-    for (const window of ['0', '-1', '366', '1.5', 'invalid']) {
-      expect((await call(`/admin/model-health?days=${window}`, undefined, admin.token)).status).toBe(400)
+function action(extra: Record<string, unknown> = {}): Record<string, unknown> & { transitionId: string; reason: string } {
+  return { transitionId: crypto.randomUUID(), reason: 'Reviewed by a moderator', ...extra }
+}
+
+async function attempts(tx: postgres.TransactionSql, points: { p: number; correct: boolean; rated?: boolean; days?: number }[]) {
+  const ids: string[] = []
+  for (const point of points) {
+    const [instance] = await tx`
+      insert into instances (item_id, seed, prompt, answer_spec)
+      values (${itemId}, 1, '[]', '{}') returning id
+    `
+    const [attempt] = await tx`
+      insert into attempts (user_id, instance_id, item_id, track_id, concept_id, family_id, kind, state, outcome, rated, confidence, forecast, answer, resolved_at)
+      select ${learnerId}, ${instance.id}, id, track_id, concept_id, family_id, 'selected', 'resolved',
+        ${point.correct ? 'correct' : 'incorrect'}, ${point.rated ?? true}, 0.9, ${point.p}, '"PRIVATE_ANSWER"',
+        now() - ${point.days ?? 0} * interval '1 day'
+      from items where id = ${itemId} returning id
+    `
+    ids.push(attempt.id)
+  }
+  return ids
+}
+
+describe('Task 7.1: admin model health and moderation', () => {
+  it('rejects a non-admin on every route before reading or validating input', async () => {
+    const routes: [string, Record<string, unknown>?][] = [
+      ['/model-health'], ['/items?flagged=1'], ['/items/test/retire', {}],
+      ['/items/test/anchor', {}], ['/flags'], ['/flags/test/resolve', {}],
+      ['/reports'], ['/users/test/action', {}],
+    ]
+    for (const [path, payload] of routes) {
+      expect((await request(path, payload, false)).status).toBe(403)
     }
   })
 
-  it('flags residual .3 at n=60, excludes n=40, and requires 200 responses to anchor', async () => {
-    const response = await call('/admin/items?flagged=1', undefined, admin.token)
-    expect(response.status).toBe(200)
-    const listed = response.data.data.items
-    expect(listed.find((item: { id: string }) => item.id === items[0])).toMatchObject({ n: 60 })
-    expect(listed.some((item: { id: string }) => item.id === items[1])).toBe(false)
-    expect((await call(`/admin/items/${encodeURIComponent(items[0])}/anchor`, { reason: 'Stable item review' }, admin.token)).status).toBe(409)
-    expect((await call(`/admin/items/${encodeURIComponent(items[3])}/anchor`, { reason: 'Provisional responses only' }, admin.token)).status).toBe(409)
-    expect((await call(`/admin/items/${encodeURIComponent(items[2])}/anchor`, { reason: 'Stable item review' }, admin.token)).status).toBe(200)
-    const [anchored] = await testSql`select anchor, anchored_at from items where id = ${items[2]}`
-    expect(anchored.anchor).toBe(true)
-    expect(anchored.anchored_at).not.toBeNull()
-    expect((await call(`/admin/items/${encodeURIComponent(items[0])}/retire`, { reason: 'Defective test item' }, admin.token)).status).toBe(200)
-    const [retired] = await testSql`select status from items where id = ${items[0]}`
-    expect(retired.status).toBe('retired')
-    expect((await call('/admin/items?flagged=oops', undefined, admin.token)).status).toBe(400)
-  })
+  it('computes model Brier, log loss, bins and counts from rated resolved forecasts only', () => fixture(async (tx) => {
+    const baseline = (await (await request('/model-health?days=30')).json()).data
+    await attempts(tx, [
+      { p: 0.8, correct: true }, { p: 0.6, correct: false },
+      { p: 0, correct: true, rated: false }, { p: 0, correct: true, days: 31 },
+    ])
+    const res = await request('/model-health?days=30')
+    expect(res.status).toBe(200)
+    const health = (await res.json()).data
+    expect(health.n).toBe(baseline.n + 2)
+    expect(health.brier).toBeCloseTo(((baseline.brier ?? 0) * baseline.n + 0.04 + 0.36) / health.n, 12)
+    expect(health.logLoss).toBeCloseTo(((baseline.logLoss ?? 0) * baseline.n - Math.log(0.8) - Math.log(0.4)) / health.n, 12)
+    expect(health.bins.reduce((sum: number, bin: { n: number }) => sum + bin.n, 0)).toBe(health.n)
+    expect(health.perTrack.reduce((sum: number, track: { n: number }) => sum + track.n, 0)).toBe(health.n)
+    expect(health.calError).toEqual(expect.any(Number))
+    expect(health.overconfidence).toEqual(expect.any(Number))
+    expect(JSON.stringify(health)).not.toContain('PRIVATE_ANSWER')
+    for (const days of ['0', '-1', '1.5', '366', 'nope', '']) {
+      expect((await request(`/model-health?days=${days}`)).status).toBe(400)
+    }
+  }))
 
-  it('lists handles and statistics in queues, resolves a flag, and logs the reason', async () => {
-    const [flag] = await testSql`
+  it('includes only items with at least 50 item events and absolute residual above 0.15', () => fixture(async (tx) => {
+    const [attemptId] = await attempts(tx, [{ p: 0.5, correct: true }])
+    async function events(n: number, expected: number) {
+      await tx`
+        insert into rating_events (attempt_id, user_id, subject_type, subject_id, r_before, rd_before, r_after, rd_after, expected, score, model_version)
+        select ${attemptId}, ${learnerId}, 'item', ${itemId}, 1200, 100, 1201, 100, ${expected}, 1, 'erm-1'
+        from generate_series(1, ${n})
+      `
+    }
+    await events(40, 0.7)
+    let rows = (await (await request('/items?flagged=1')).json()).data.items
+    expect(rows.find((row: { id: string }) => row.id === itemId)).toBeUndefined()
+    await events(20, 0.7)
+    rows = (await (await request('/items?flagged=1')).json()).data.items
+    expect(rows.find((row: { id: string }) => row.id === itemId)).toMatchObject({ n: 60, residual: expect.closeTo(0.3, 12) })
+    await tx`update rating_events set expected = 0.9 where subject_id = ${itemId}`
+    rows = (await (await request('/items?flagged=1')).json()).data.items
+    expect(rows.find((row: { id: string }) => row.id === itemId)).toBeUndefined()
+  }))
+
+  it('uses one final weekly rating per stable learner and monitors frozen anchors without item events', () => fixture(async (tx) => {
+    const baseline = (await (await request('/model-health')).json()).data
+    const ids = await attempts(tx, Array.from({ length: 101 }, (_, i) => ({ p: 0.75, correct: true, days: i === 100 ? 0 : 1 })))
+    await tx`
+      insert into rating_events (attempt_id, user_id, subject_type, subject_id, r_before, rd_before, r_after, rd_after, expected, score, model_version, created_at)
+      select a.id, a.user_id, 'track', a.track_id, 1200, 100,
+        case when a.id = ${ids[100]}::uuid then 1400 else 1300 end, 100, 0.75, 1, 'erm-1', a.resolved_at
+      from attempts a where a.user_id = ${learnerId}
+    `
+    await tx`update items set anchor = true where id = ${itemId}`
+    await tx`update items set anchored_at = now() - interval '12 hours' where id = ${itemId}`
+    const health = (await (await request('/model-health')).json()).data
+    const [item] = await tx`select track_id from items where id = ${itemId}`
+    const [clock] = await tx`select date_trunc('week', now() at time zone 'UTC')::date::text as week`
+    const drift = health.learnerDrift.find((point: { track: string; week: string }) => point.track === item.track_id && point.week === clock.week)
+    const before = baseline.learnerDrift.find((point: { track: string; week: string }) => point.track === item.track_id && point.week === drift.week)
+    expect(drift.n).toBe((before?.n ?? 0) + 1)
+    expect(drift.meanRating).toBeCloseTo(((before?.meanRating ?? 0) * (before?.n ?? 0) + 1400) / drift.n, 10)
+    const anchor = health.anchorDrift.find((point: { track: string; week: string }) => point.track === item.track_id && point.week === clock.week)
+    const anchorBefore = baseline.anchorDrift.find((point: { track: string; week: string }) => point.track === item.track_id && point.week === anchor.week)
+    expect(anchor.n).toBe((anchorBefore?.n ?? 0) + 1)
+    expect(anchor.residual).toBeCloseTo(((anchorBefore?.residual ?? 0) * (anchorBefore?.n ?? 0) + 0.25) / anchor.n, 10)
+  }))
+
+  it('denies browser roles direct access to the diagnostic view and function', () => fixture(async (tx) => {
+    for (const role of ['anon', 'authenticated']) {
+      const [permissions] = await tx`
+        select has_function_privilege(${role}, 'public.admin_model_health(integer)', 'execute') as execute,
+          has_table_privilege(${role}, 'public.admin_item_residuals', 'select') as read
+      `
+      expect(permissions).toEqual({ execute: false, read: false })
+    }
+  }))
+
+  it('requires 200 responses before anchoring, records the freeze, and replays retries once', () => fixture(async (tx) => {
+    expect((await request(`/items/${encodeURIComponent(itemId)}/anchor`, action())).status).toBe(409)
+    await tx`update items set n = 200 where id = ${itemId}`
+    const payload = action()
+    expect((await request(`/items/${encodeURIComponent(itemId)}/anchor`, payload)).status).toBe(200)
+    expect((await request(`/items/${encodeURIComponent(itemId)}/anchor`, payload)).status).toBe(200)
+    const [item] = await tx`select anchor, anchored_at, rating, rd from items where id = ${itemId}`
+    expect(item).toMatchObject({ anchor: true, rating: 1200, rd: 250 })
+    expect(item.anchored_at).not.toBeNull()
+    const notes = await tx`select params from moderation_actions where admin_id = ${adminId}`
+    expect(notes).toHaveLength(1)
+    expect(notes[0].params).toMatchObject({ itemId, operation: 'anchor', rating: 1200, rd: 250 })
+  }))
+
+  it('retires an item with an audit note and leaves its attempts intact', () => fixture(async (tx) => {
+    const [attemptId] = await attempts(tx, [{ p: 0.5, correct: true }])
+    expect((await request(`/items/${encodeURIComponent(itemId)}/retire`, action())).status).toBe(200)
+    const [item] = await tx`select status from items where id = ${itemId}`
+    expect(item.status).toBe('retired')
+    expect(await tx`select id from attempts where id = ${attemptId}`).toHaveLength(1)
+    const [note] = await tx`select action, params from moderation_actions where admin_id = ${adminId}`
+    expect(note).toMatchObject({ action: 'note', params: { itemId, operation: 'retire', replayPending: true } })
+  }))
+
+  it('ban hides a learner after leaderboard refresh; unban restores eligibility and both actions are logged', () => fixture(async (tx) => {
+    await tx`
+      insert into track_ratings (user_id, track_id, rating, rd, n, peak, last_at)
+      values (${learnerId}, 'judgment', 1400, 80, 25, 1400, now())
+    `
+    const [profile] = await tx`select handle from profiles where id = ${learnerId}`
+    await tx`refresh materialized view private.leaderboard`
+    expect(await tx`select handle from leaderboard where handle = ${profile.handle}`).not.toHaveLength(0)
+    expect((await request(`/users/${learnerId}/action`, action({ action: 'ban' }))).status).toBe(200)
+    await tx`refresh materialized view private.leaderboard`
+    expect(await tx`select handle from leaderboard where handle = ${profile.handle}`).toHaveLength(0)
+    expect((await request(`/users/${learnerId}/action`, action({ action: 'unban' }))).status).toBe(200)
+    await tx`refresh materialized view private.leaderboard`
+    expect(await tx`select handle from leaderboard where handle = ${profile.handle}`).not.toHaveLength(0)
+    expect(await tx`select id from moderation_actions where user_id = ${learnerId}`).toHaveLength(2)
+  }))
+
+  it('unrates only resolved attempts in the selected period, preserves history, and queues replay once', () => fixture(async (tx) => {
+    const [recentId, oldId] = await attempts(tx, [{ p: 0.5, correct: true }, { p: 0.5, correct: false, days: 10 }])
+    const payload = action({ action: 'unrate', from: new Date(Date.now() - 86400000).toISOString() })
+    expect((await request(`/users/${learnerId}/action`, payload)).status).toBe(200)
+    expect((await request(`/users/${learnerId}/action`, payload)).status).toBe(200)
+    const rows = await tx`select id, rated, answer from attempts where user_id = ${learnerId}`
+    expect(rows.find((row) => row.id === recentId)).toMatchObject({ rated: false, answer: 'PRIVATE_ANSWER' })
+    expect(rows.find((row) => row.id === oldId)?.rated).toBe(true)
+    const notes = await tx`select action, params from moderation_actions where user_id = ${learnerId}`
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toMatchObject({ action: 'unrate', params: { from: payload.from, replayPending: true, affected: 1 } })
+  }))
+
+  it('validates identifiers, reasons, transitions, actions, and ISO dates without partial writes', () => fixture(async (tx) => {
+    const path = `/users/${learnerId}/action`
+    for (const payload of [
+      action({ reason: ' ' }), action({ reason: 'x'.repeat(1001) }),
+      action({ action: 'delete' }), action({ transitionId: 'bad' }),
+      action({ action: 'unrate', from: 'yesterday' }),
+      action({ action: 'unrate', from: '2026-02-30T00:00:00Z' }),
+      action({ action: 'unrate', from: '2026-01-01' }),
+    ]) expect((await request(path, payload)).status).toBe(400)
+    expect((await request('/users/not-a-uuid/action', action({ action: 'ban' }))).status).toBe(400)
+    expect((await request(`/users/${crypto.randomUUID()}/action`, action({ action: 'ban' }))).status).toBe(404)
+    expect(await tx`select id from moderation_actions where admin_id = ${adminId}`).toHaveLength(0)
+  }))
+
+  it('queues flags and reports with handles and statistics only and audits flag resolution', () => fixture(async (tx) => {
+    const [flag] = await tx`
       insert into integrity_flags (user_id, track_id, kind, detail)
-      values (${target.user.id}, 'judgment', 'improbable_run', '{"n":30,"z":5.48}'::jsonb) returning id
+      values (${learnerId}, 'judgment', 'rapid_gain', '{"gain":450,"answer":"PRIVATE_ANSWER","code":"PRIVATE_CODE"}') returning id
     `
-    const [report] = await testSql`
-      insert into reports (reporter_id, target_id, reason)
-      values (${learner.user.id}, ${target.user.id}, 'Please review this account') returning id
-    `
-    const flags = await call('/admin/flags', undefined, admin.token)
-    expect(flags.status).toBe(200)
-    expect(flags.data.data.flags.find((f: { id: string }) => f.id === flag.id)).toMatchObject({ handle: `${prefix}_2` })
-    const reports = await call('/admin/reports', undefined, admin.token)
-    expect(reports.status).toBe(200)
-    expect(reports.data.data.reports.find((r: { id: string }) => r.id === report.id)).toMatchObject({ handle: `${prefix}_2` })
-    expect(JSON.stringify([flags.data, reports.data])).not.toContain('PRIVATE_ANSWER')
-    expect((await call(`/admin/flags/${flag.id}/resolve`, { reason: 'Reviewed outcomes; no action' }, admin.token)).status).toBe(200)
-    expect((await call(`/admin/flags/${flag.id}/resolve`, { reason: 'Duplicate review' }, admin.token)).status).toBe(409)
-    const logs = await testSql`select reason, params from moderation_actions where admin_id = ${admin.user.id} and reason = 'Reviewed outcomes; no action'`
-    expect(logs).toHaveLength(1)
-    expect(logs[0]).toMatchObject({ reason: 'Reviewed outcomes; no action', params: { flagId: flag.id } })
-  })
-
-  it('ban removes leaderboard eligibility, unban restores it, and unrate queues replay without deletion', async () => {
-    await testSql`update track_ratings set n = 30, rd = 80, last_at = now() where user_id = ${target.user.id}`
-    await testSql`refresh materialized view private.leaderboard`
-    expect((await testSql`select handle from leaderboard where handle = ${`${prefix}_2`} and track_id = 'judgment'`).length).toBe(1)
-    const action = (name: string, extra = {}) => call(`/admin/users/${target.user.id}/action`, { action: name, reason: 'Reviewed account evidence', ...extra }, admin.token)
-    expect((await action('ban')).status).toBe(200)
-    await testSql`refresh materialized view private.leaderboard`
-    expect((await testSql`select handle from leaderboard where handle = ${`${prefix}_2`}`).length).toBe(0)
-    expect((await action('unban')).status).toBe(200)
-    const [before] = await testSql`select count(*)::int as n from attempts where user_id = ${target.user.id}`
-    expect((await action('unrate', { from: new Date(Date.now() - 60_000).toISOString() })).status).toBe(200)
-    const [after] = await testSql`select count(*)::int as n, count(*) filter (where rated)::int as rated from attempts where user_id = ${target.user.id}`
-    expect(after).toEqual({ n: before.n, rated: 0 })
-    const [log] = await testSql`select params from moderation_actions where admin_id = ${admin.user.id} and action = 'unrate'`
-    expect(log.params).toMatchObject({ replayRequired: true })
-  })
-
-  it('rejects invalid IDs, dates, actions and empty reasons without mutations', async () => {
-    for (const data of [
-      { action: 'ban', reason: '' }, { action: 'delete', reason: 'Invalid action' },
-      { action: ['ban'], reason: 'Invalid action type' },
-      { action: 'unrate', reason: 'Invalid cutoff', from: 'yesterday' },
-      { action: 'unrate', reason: 'Invalid cutoff', from: '2026-02-30T00:00:00Z' },
-    ]) expect((await call(`/admin/users/${target.user.id}/action`, data, admin.token)).status).toBe(400)
-    expect((await call('/admin/users/nope/action', { action: 'ban', reason: 'Review account' }, admin.token)).status).toBe(400)
-    expect((await call(`/admin/items/${encodeURIComponent(items[1])}/retire`, {}, admin.token)).status).toBe(400)
-    expect((await call(`/admin/users/${crypto.randomUUID()}/action`, { action: 'ban', reason: 'Review account' }, admin.token)).status).toBe(404)
-  })
+    await tx`insert into reports (reporter_id, target_id, reason) values (${adminId}, ${learnerId}, 'Please review these outcomes')`
+    for (const path of ['/flags', '/reports', '/items']) {
+      const res = await request(path)
+      expect(res.status).toBe(200)
+      const text = await res.text()
+      expect(text).not.toContain('PRIVATE_ANSWER')
+      expect(text).not.toContain('PRIVATE_CODE')
+      expect(text).toContain(path === '/items' ? itemId : `adm_${learnerId.slice(0, 8)}`)
+    }
+    const payload = action()
+    expect((await request(`/flags/${flag.id}/resolve`, payload)).status).toBe(200)
+    expect((await request(`/flags/${flag.id}/resolve`, payload)).status).toBe(200)
+    const [resolved] = await tx`select resolved_at, resolution from integrity_flags where id = ${flag.id}`
+    expect(resolved.resolved_at).not.toBeNull()
+    expect(resolved.resolution).toBe(payload.reason)
+    expect(await tx`select id from moderation_actions where admin_id = ${adminId}`).toHaveLength(1)
+  }))
 })

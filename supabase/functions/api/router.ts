@@ -1,4 +1,4 @@
-import { fail, HttpError } from './http.ts'
+import { fail, HttpError, isUuid } from './http.ts'
 import {
   handleOnboarding,
   handleGetMe,
@@ -32,8 +32,8 @@ import {
   handleGetCodeSubmission,
 } from './routes/code.ts'
 import {
-  handleModelHealth, handleAdminItems, handleRetireItem, handleAnchorItem,
-  handleAdminFlags, handleResolveFlag, handleAdminReports, handleUserAction,
+  handleModelHealth, handleAdminItems, handleModerateItem, handleAdminFlags,
+  handleResolveFlag, handleAdminReports, handleModerateUser,
 } from './routes/admin.ts'
 
 export type Ctx = {
@@ -75,12 +75,12 @@ function createRoute(method: string, pattern: string, handler: RouteHandler): Ro
 const routes: RouteEntry[] = [
   createRoute('GET', '/admin/model-health', handleModelHealth),
   createRoute('GET', '/admin/items', handleAdminItems),
-  createRoute('POST', '/admin/items/:id/retire', handleRetireItem),
-  createRoute('POST', '/admin/items/:id/anchor', handleAnchorItem),
+  createRoute('POST', '/admin/items/:id/retire', handleModerateItem),
+  createRoute('POST', '/admin/items/:id/anchor', handleModerateItem),
   createRoute('GET', '/admin/flags', handleAdminFlags),
   createRoute('POST', '/admin/flags/:id/resolve', handleResolveFlag),
   createRoute('GET', '/admin/reports', handleAdminReports),
-  createRoute('POST', '/admin/users/:id/action', handleUserAction),
+  createRoute('POST', '/admin/users/:id/action', handleModerateUser),
   createRoute('POST', '/onboarding', handleOnboarding),
   createRoute('GET', '/me', handleGetMe),
   createRoute('POST', '/handle', handleUpdateHandle),
@@ -111,18 +111,24 @@ export async function route(req: Request, ctx: Omit<Ctx, 'params'>): Promise<Res
     pathname = pathname.slice('/api'.length) || '/'
   }
 
+  if ((pathname === '/admin' || pathname.startsWith('/admin/')) && !ctx.isAdmin) {
+    return fail('forbidden', 'Admin access required')
+  }
+
   for (const r of routes) {
     if (r.method === req.method) {
       const match = pathname.match(r.regex)
       if (match) {
         const params: Record<string, string> = {}
         for (let i = 0; i < r.paramNames.length; i++) {
-          try {
-            params[r.paramNames[i]] = decodeURIComponent(match[i + 1])
-          } catch (error) {
-            if (error instanceof URIError) throw new HttpError('invalid', 'Malformed route parameter')
-            throw error
-          }
+          let value: string
+          try { value = decodeURIComponent(match[i + 1]) }
+          catch { throw new HttpError('invalid', 'Invalid path identifier') }
+          const valid = r.pattern.startsWith('/admin/items/')
+            ? /^[a-z]+\.[a-z0-9.-]+@[1-9][0-9]*#[1-9][0-9]*$/.test(value)
+            : isUuid(value)
+          if (!valid) throw new HttpError('invalid', 'Invalid path identifier')
+          params[r.paramNames[i]] = value
         }
         return await r.handler({ ...ctx, params, req })
       }
